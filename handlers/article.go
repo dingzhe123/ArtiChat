@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"html/template"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -14,11 +15,14 @@ import (
 	"github.com/yuin/goldmark"
 )
 
+const maxArticleBodySize = 1 << 20 // 1 MB
+
 // ArticleHandler handles article pages and API.
 type ArticleHandler struct {
 	ListTmpl   *template.Template
 	DetailTmpl *template.Template
 	Service    *services.ArticleService
+	RAG        *services.RAGService // optional — set to enable auto-indexing
 }
 
 // List renders the article list page — GET /articles.
@@ -108,6 +112,7 @@ func (h *ArticleHandler) GetArticle(w http.ResponseWriter, r *http.Request) {
 
 // Create handles article creation — POST /api/articles.
 func (h *ArticleHandler) Create(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxArticleBodySize)
 	var a models.Article
 	if err := json.NewDecoder(r.Body).Decode(&a); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
@@ -124,13 +129,18 @@ func (h *ArticleHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	id, err := h.Service.Create(&a)
 	if err != nil {
+		log.Printf("ERROR: create article: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
-			"ok": false, "error": err.Error(),
+			"ok": false, "error": "创建文章失败",
 		})
 		return
 	}
 
 	a.ID = id
+	// Auto-index the new article
+	if h.RAG != nil {
+		go func() { _ = h.RAG.IndexArticle(&a) }()
+	}
 	writeJSON(w, http.StatusCreated, map[string]interface{}{"ok": true, "data": a})
 }
 
@@ -144,6 +154,7 @@ func (h *ArticleHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxArticleBodySize)
 	var a models.Article
 	if err := json.NewDecoder(r.Body).Decode(&a); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{
@@ -154,13 +165,18 @@ func (h *ArticleHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	a.ID = id
 	if err := h.Service.Update(&a); err != nil {
+		log.Printf("ERROR: update article %d: %v", id, err)
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
-			"ok": false, "error": err.Error(),
+			"ok": false, "error": "更新文章失败",
 		})
 		return
 	}
 
 	updated, _ := h.Service.GetByID(id)
+	// Re-index the updated article
+	if h.RAG != nil && updated != nil {
+		go func() { _ = h.RAG.IndexArticle(updated) }()
+	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "data": updated})
 }
 
@@ -175,12 +191,17 @@ func (h *ArticleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.Service.Delete(id); err != nil {
+		log.Printf("ERROR: delete article %d: %v", id, err)
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
-			"ok": false, "error": err.Error(),
+			"ok": false, "error": "删除文章失败",
 		})
 		return
 	}
 
+	// Remove associated chunks
+	if h.RAG != nil {
+		_ = h.RAG.DeleteChunks(id)
+	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
 }
 

@@ -29,6 +29,15 @@ func main() {
 	}
 	defer articleSvc.Close()
 
+	// LLM client
+	llmClient := services.NewLLMClient(cfg.LLMAPIKey, cfg.LLMBaseURL, cfg.LLMModel, cfg.EmbeddingModel)
+
+	// RAG service
+	ragSvc, err := services.NewRAGService(articleSvc.DB(), llmClient)
+	if err != nil {
+		log.Fatalf("failed to init RAG service: %v", err)
+	}
+
 	// Per-handler template sets — each set includes base.html plus exactly
 	// one content template, so {{block "content"}} resolves to the right page.
 	homeTmpl := parseSet("templates/home.html")
@@ -42,8 +51,14 @@ func main() {
 		ListTmpl:   articlesListTmpl,
 		DetailTmpl: articlesDetailTmpl,
 		Service:    articleSvc,
+		RAG:        ragSvc,
 	}
 	adminH := &handlers.AdminHandler{Tmpl: adminTmpl, Service: articleSvc}
+	chatH := &handlers.ChatHandler{
+		RAG:            ragSvc,
+		LLM:            llmClient,
+		ArticleService: articleSvc,
+	}
 
 	// Basic Auth wrapper for admin routes
 	auth := handlers.BasicAuth(cfg.AdminUser, cfg.AdminPass)
@@ -59,11 +74,17 @@ func main() {
 	// Admin pages (protected)
 	mux.HandleFunc("GET /admin", auth(adminH.Page))
 
-	// API endpoints (protected)
+	// API — article CRUD (protected)
 	mux.HandleFunc("GET /api/articles/{id}", auth(articleH.GetArticle))
 	mux.HandleFunc("POST /api/articles", auth(articleH.Create))
 	mux.HandleFunc("PUT /api/articles/{id}", auth(articleH.Update))
 	mux.HandleFunc("DELETE /api/articles/{id}", auth(articleH.Delete))
+
+	// API — chat (public)
+	mux.HandleFunc("POST /api/chat", chatH.HandleChat)
+
+	// API — reindex (protected)
+	mux.HandleFunc("POST /api/reindex", auth(chatH.HandleReindex))
 
 	// Static files
 	fs := http.FileServer(http.Dir("static"))

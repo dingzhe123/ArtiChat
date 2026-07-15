@@ -51,6 +51,11 @@ func createTables(db *sql.DB) error {
 	return err
 }
 
+// DB returns the underlying database connection (for use by other services).
+func (s *ArticleService) DB() *sql.DB {
+	return s.db
+}
+
 // Close closes the underlying database connection.
 func (s *ArticleService) Close() error {
 	return s.db.Close()

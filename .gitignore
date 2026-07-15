@@ -15,6 +15,9 @@ data/site.db-*
 .vscode/
 .idea/
 
+# Environment secrets
+.env
+
 # Project docs (local only)
 CLAUDE.md
 
