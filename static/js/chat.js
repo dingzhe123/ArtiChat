@@ -29,6 +29,24 @@
   toggle.addEventListener('click', openPanel);
   closeBtn.addEventListener('click', closePanel);
 
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function (e) {
+    // Ctrl+K or / to open chat (only when not in input fields)
+    if ((e.ctrlKey && e.key === 'k') || (e.key === '/' && !isInputFocused())) {
+      e.preventDefault();
+      openPanel();
+    }
+    // Escape to close
+    if (e.key === 'Escape' && isOpen) {
+      closePanel();
+    }
+  });
+
+  function isInputFocused() {
+    var el = document.activeElement;
+    return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+  }
+
   // --- Escape HTML ---
   function escapeHtml(text) {
     var div = document.createElement('div');
@@ -39,19 +57,15 @@
   // --- Simple markdown-like formatting ---
   function formatText(text) {
     text = escapeHtml(text);
-    // Bold
     text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    // Inline code
     text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-    // Newlines
     text = text.replace(/\n/g, '<br>');
-    // Headings (## at start of line)
     text = text.replace(/^## (.+)$/gm, '<h4>$1</h4>');
     return text;
   }
 
   // --- Render message ---
-  function addMessage(role, content, sources) {
+  function addMessage(role, content, sources, isError) {
     var div = document.createElement('div');
     div.className = 'chat-message ' + role;
 
@@ -64,7 +78,7 @@
       srcDiv.className = 'chat-sources';
       var srcTitle = document.createElement('div');
       srcTitle.className = 'chat-sources-title';
-      srcTitle.textContent = '📚 参考来源';
+      srcTitle.textContent = '📚 参考来源 (' + sources.length + ')';
       srcTitle.addEventListener('click', function () {
         srcDiv.classList.toggle('expanded');
       });
@@ -80,6 +94,17 @@
       });
       srcDiv.appendChild(srcList);
       bubble.appendChild(srcDiv);
+    }
+
+    if (isError) {
+      var retryBtn = document.createElement('button');
+      retryBtn.className = 'chat-retry';
+      retryBtn.textContent = '🔄 重试';
+      retryBtn.addEventListener('click', function () {
+        div.remove();
+        sendMessage(lastQuestion);
+      });
+      bubble.appendChild(retryBtn);
     }
 
     div.appendChild(bubble);
@@ -106,10 +131,13 @@
   }
 
   // --- Send message ---
-  function sendMessage() {
-    var question = inputEl.value.trim();
+  var lastQuestion = '';
+
+  function sendMessage(optQuestion) {
+    var question = optQuestion || inputEl.value.trim();
     if (!question || sendBtn.disabled) return;
 
+    lastQuestion = question;
     inputEl.value = '';
     addMessage('user', question);
     showLoading();
@@ -133,11 +161,11 @@
       })
       .catch(function (err) {
         hideLoading();
-        addMessage('assistant', '抱歉，出错了 😅\n\n' + escapeHtml(err.message));
+        addMessage('assistant', '抱歉，出错了 😅\n\n' + escapeHtml(err.message), null, true);
       });
   }
 
-  sendBtn.addEventListener('click', sendMessage);
+  sendBtn.addEventListener('click', function () { sendMessage(); });
   inputEl.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();

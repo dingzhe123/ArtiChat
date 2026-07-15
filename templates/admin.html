@@ -17,16 +17,23 @@
                     <input type="text" id="author" class="form-input" placeholder="作者名" required>
                 </div>
                 <div class="form-group">
-                    <label for="tags">标签（逗号分隔）</label>
-                    <input type="text" id="tags" class="form-input" placeholder="例如: Go, AI, 教程">
+                    <label for="tags-input">标签（回车添加，逗号分隔）</label>
+                    <div class="tags-wrapper" id="tags-wrapper">
+                        <div id="tags-chips" class="tags-chips"></div>
+                        <input type="text" id="tags-input" class="form-input" placeholder="输入标签后按回车">
+                    </div>
+                    <input type="hidden" id="tags" name="tags">
                 </div>
                 <div class="form-group">
-                    <label for="content">内容（Markdown）</label>
-                    <textarea id="content" class="form-input form-textarea" rows="15" placeholder="Markdown 格式内容..." required></textarea>
+                    <label for="content">内容（Markdown）
+                        <span class="char-count" id="char-count">0 字</span>
+                    </label>
+                    <textarea id="content" class="form-input form-textarea" rows="15"
+                        placeholder="支持 Markdown 格式：&#10;# 标题&#10;**加粗**&#10;- 列表&#10;`代码`" required></textarea>
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary" id="submit-btn">发布文章</button>
-                    <button type="button" class="btn btn-secondary" id="cancel-btn">取消编辑</button>
+                    <button type="button" class="btn btn-secondary" id="cancel-btn" style="display:none;">取消编辑</button>
                 </div>
             </form>
             <div id="form-msg" class="form-msg" style="display:none;"></div>
@@ -51,7 +58,7 @@
                         {{range .Articles}}
                         <tr data-id="{{.ID}}">
                             <td>{{.ID}}</td>
-                            <td><a href="/articles/{{.ID}}">{{.Title}}</a></td>
+                            <td><a href="/articles/{{.ID}}" title="{{.Title}}">{{printf "%.30s" .Title}}</a></td>
                             <td>{{.Author}}</td>
                             <td>{{.CreatedAt.Format "2006-01-02"}}</td>
                             <td class="actions">
@@ -63,7 +70,10 @@
                     </tbody>
                 </table>
                 {{else}}
-                <p class="empty-msg">暂无文章，使用左侧表单发布第一篇吧 🚀</p>
+                <div class="empty-state">
+                    <p>📝 暂无文章</p>
+                    <p class="empty-hint">在左侧填写标题和内容，点击「发布文章」创建第一篇</p>
+                </div>
                 {{end}}
             </div>
         </div>

@@ -46,7 +46,7 @@ func main() {
 	adminTmpl := parseSet("templates/admin.html")
 
 	// Handlers
-	homeH := &handlers.HomeHandler{Tmpl: homeTmpl}
+	homeH := &handlers.HomeHandler{Tmpl: homeTmpl, Service: articleSvc}
 	articleH := &handlers.ArticleHandler{
 		ListTmpl:   articlesListTmpl,
 		DetailTmpl: articlesDetailTmpl,

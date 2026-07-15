@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"html/template"
 	"log"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -15,7 +16,10 @@ import (
 	"github.com/yuin/goldmark"
 )
 
-const maxArticleBodySize = 1 << 20 // 1 MB
+const (
+	maxArticleBodySize = 1 << 20 // 1 MB
+	charsPerMinute     = 400     // avg reading speed for Chinese
+)
 
 // ArticleHandler handles article pages and API.
 type ArticleHandler struct {
@@ -68,8 +72,13 @@ func (h *ArticleHandler) Detail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Plain-text description from markdown
+	// Plain-text description + reading time
 	desc := truncate(stripMarkdown(article.Content), 160)
+	charCount := len([]rune(article.Content))
+	readMin := int(math.Ceil(float64(charCount) / float64(charsPerMinute)))
+	if readMin < 1 {
+		readMin = 1
+	}
 
 	canonical := canonicalURL(r, "/articles/"+strconv.FormatInt(article.ID, 10))
 	data := map[string]interface{}{
@@ -83,6 +92,7 @@ func (h *ArticleHandler) Detail(w http.ResponseWriter, r *http.Request) {
 		"StructuredData":   articleDetailStructuredData(canonical, article, desc),
 		"Article":          article,
 		"ContentHTML":      template.HTML(buf.String()),
+		"ReadMin":          readMin,
 	}
 	if err := h.DetailTmpl.ExecuteTemplate(w, "base.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

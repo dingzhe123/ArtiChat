@@ -1,4 +1,34 @@
 {{define "content"}}
+{{if .HasArticles}}
+<section class="hero hero-sm">
+    <h1>📚 探索知识，与 AI 对话</h1>
+    <p>浏览最新文章，或向 AI 助手提问，它会基于文章内容为你解答。</p>
+</section>
+
+<section class="recent-articles">
+    <h2>📌 最新文章</h2>
+    <div class="article-list">
+        {{range .Articles}}
+        <article class="article-card">
+            <h3><a href="/articles/{{.ID}}">{{.Title}}</a></h3>
+            <div class="article-meta">
+                <span>✍️ {{.Author}}</span>
+                <span>📅 {{.CreatedAt.Format "2006-01-02"}}</span>
+                {{if .Tags}}
+                <span>🏷️ {{range $i, $t := .Tags}}{{if $i}}, {{end}}{{$t}}{{end}}</span>
+                {{end}}
+            </div>
+            <p class="article-excerpt">{{printf "%.200s" .Content}}...</p>
+            <a href="/articles/{{.ID}}" class="read-more">阅读全文 →</a>
+        </article>
+        {{end}}
+    </div>
+    <div class="hero-actions" style="margin-top:16px;">
+        <a href="/articles" class="btn btn-secondary">查看全部文章</a>
+        <a href="/admin" class="btn btn-primary">管理文章</a>
+    </div>
+</section>
+{{else}}
 <section class="hero">
     <h1>📚 探索知识，与 AI 对话</h1>
     <p>本站文章由 AI 辅助整理。阅读文章时，您可以随时向智能助手提问，它会基于文章内容为您解答。</p>
@@ -22,4 +52,5 @@
         <p>大模型驱动，秒级响应你的提问</p>
     </div>
 </section>
+{{end}}
 {{end}}
