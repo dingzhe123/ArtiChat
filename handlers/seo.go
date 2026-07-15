@@ -11,9 +11,7 @@ import (
 	"ai-article-site/models"
 )
 
-// --- Canonical URL ---
-
-// canonicalURL builds the full canonical URL from the request.
+// canonicalURL 根据请求构造完整的规范链接。
 func canonicalURL(r *http.Request, path string) string {
 	scheme := "http"
 	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
@@ -22,8 +20,7 @@ func canonicalURL(r *http.Request, path string) string {
 	return fmt.Sprintf("%s://%s%s", scheme, r.Host, path)
 }
 
-// --- Markdown stripping (for plain-text descriptions) ---
-
+// 用于清洗 Markdown 格式的正则表达式。
 var (
 	reHeading  = regexp.MustCompile(`^#{1,6}\s+`)
 	reLink     = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
@@ -34,7 +31,7 @@ var (
 	reHTML     = regexp.MustCompile(`<[^>]*>`)
 )
 
-// stripMarkdown removes common markdown syntax for use as plain-text description.
+// stripMarkdown 移除常见 Markdown 语法，返回纯文本用于描述。
 func stripMarkdown(s string) string {
 	s = reImage.ReplaceAllString(s, "")
 	s = reLink.ReplaceAllString(s, "$1")
@@ -45,24 +42,21 @@ func stripMarkdown(s string) string {
 	s = reHTML.ReplaceAllString(s, "")
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.ReplaceAll(s, "\r", " ")
-	// Collapse multiple spaces
 	spaceRE := regexp.MustCompile(`\s+`)
 	s = spaceRE.ReplaceAllString(s, " ")
 	return strings.TrimSpace(s)
 }
 
-// truncate truncates a string to maxLen runes, appending "…" if needed.
+// truncate 将字符串截断到 maxLen 个字符，超出部分用 "…" 代替。
 func truncate(s string, maxLen int) string {
 	runes := []rune(s)
 	if len(runes) <= maxLen {
 		return s
 	}
-	return string(runes[:maxLen]) + "…"
+	return string(runes[:maxLen]) + "..."
 }
 
-// --- Structured Data (JSON-LD) ---
-
-// homeStructuredData returns JSON-LD for the homepage.
+// homeStructuredData 返回首页的 JSON-LD 结构化数据。
 func homeStructuredData(canonical string) template.HTML {
 	return template.HTML(fmt.Sprintf(
 		`<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"AI 智能文章站","description":"一个带智能问答机器人的文章网站，基于 AI 大模型为你解答文章中的任何问题。","url":"%s"}</script>`,
@@ -70,9 +64,9 @@ func homeStructuredData(canonical string) template.HTML {
 	))
 }
 
-// articleListStructuredData returns JSON-LD for the article list page.
+// articleListStructuredData 返回文章列表页的 JSON-LD。
 func articleListStructuredData(canonical string, articles []models.Article) template.HTML {
-	// canonical is e.g. "http://host/articles" — extract base for article URLs
+	// canonical 格式为 "http://host/articles"，提取基础路径拼文章链接
 	base := strings.TrimSuffix(canonical, "/articles")
 	items := make([]string, 0, len(articles))
 	for i, a := range articles {
@@ -87,7 +81,7 @@ func articleListStructuredData(canonical string, articles []models.Article) temp
 	))
 }
 
-// articleDetailStructuredData returns JSON-LD for an article detail page.
+// articleDetailStructuredData 返回文章详情页的 JSON-LD。
 func articleDetailStructuredData(canonical string, a *models.Article, desc string) template.HTML {
 	return template.HTML(fmt.Sprintf(
 		`<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"%s","description":"%s","author":{"@type":"Person","name":"%s"},"datePublished":"%s","dateModified":"%s","url":"%s"}</script>`,

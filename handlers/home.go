@@ -7,16 +7,16 @@ import (
 	"ai-article-site/services"
 )
 
-// HomeHandler serves the homepage.
+// HomeHandler 处理主页请求。
 type HomeHandler struct {
 	Tmpl    *template.Template
 	Service *services.ArticleService
 }
 
-// ServeHTTP renders the home page — GET /.
+// ServeHTTP 渲染主页 — GET /。
 func (h *HomeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	articles, _ := h.Service.List()
-	// Limit to 5 newest
+	// 最多展示 5 篇最新文章
 	recent := articles
 	if len(recent) > 5 {
 		recent = recent[:5]

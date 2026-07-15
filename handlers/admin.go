@@ -8,13 +8,13 @@ import (
 	"ai-article-site/services"
 )
 
-// AdminHandler handles the admin management page.
+// AdminHandler 处理管理后台页面。
 type AdminHandler struct {
 	Tmpl    *template.Template
 	Service *services.ArticleService
 }
 
-// Page renders the admin dashboard — GET /admin.
+// Page 渲染管理后台 — GET /admin。
 func (h *AdminHandler) Page(w http.ResponseWriter, r *http.Request) {
 	articles, err := h.Service.List()
 	if err != nil {

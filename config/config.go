@@ -6,25 +6,27 @@ import (
 	"strings"
 )
 
+// Config 保存所有应用配置项。
 type Config struct {
-	Port           string
-	DBPath         string
-	LLMAPIKey      string
-	LLMBaseURL     string
-	LLMModel       string
-	EmbeddingModel string
-	AdminUser      string
-	AdminPass      string
+	Port           string // 监听端口
+	DBPath         string // SQLite 数据库路径
+	LLMAPIKey      string // 大模型 API 密钥
+	LLMBaseURL     string // 大模型 API 基础地址
+	LLMModel       string // 对话模型名称
+	EmbeddingModel string // Embedding 模型名称
+	AdminUser      string // 管理后台用户名
+	AdminPass      string // 管理后台密码
 }
 
+// Load 加载配置：优先环境变量，其次 .env 文件，最后使用默认值（仅限非敏感项）。
 func Load() *Config {
-	// Load .env file if present (ignore errors — env vars take precedence)
+	// 加载 .env 文件（如存在），环境变量优先级更高
 	_ = loadDotEnv(".env")
 
 	cfg := &Config{
 		Port:           getEnvDefault("PORT", "8080"),
 		DBPath:         getEnvDefault("DB_PATH", "data/site.db"),
-		LLMAPIKey:      os.Getenv("LLM_API_KEY"),
+		LLMAPIKey:      os.Getenv("LLM_API_KEY"),                      // 必须由用户配置
 		LLMBaseURL:     getEnvDefault("LLM_BASE_URL", "https://api.deepseek.com/v1"),
 		LLMModel:       getEnvDefault("LLM_MODEL", "deepseek-chat"),
 		EmbeddingModel: getEnvDefault("EMBEDDING_MODEL", "text-embedding-ada-002"),
@@ -33,12 +35,13 @@ func Load() *Config {
 	}
 
 	if cfg.LLMAPIKey == "" {
-		fmt.Fprintln(os.Stderr, "WARNING: LLM_API_KEY is not set. Chat and RAG features will fail.")
+		fmt.Fprintln(os.Stderr, "警告: LLM_API_KEY 未设置，聊天和 RAG 功能将不可用。")
 	}
 
 	return cfg
 }
 
+// getEnvDefault 读取环境变量，未设置则返回 fallback。
 func getEnvDefault(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -46,9 +49,8 @@ func getEnvDefault(key, fallback string) string {
 	return fallback
 }
 
-// loadDotEnv reads a simple KEY=VALUE .env file and sets os.Environ for each line.
-// It skips blank lines and comments starting with #. Values are not quoted; quotes
-// become part of the value.
+// loadDotEnv 解析简单的 KEY=VALUE 格式 .env 文件，将键值写入环境变量。
+// 跳过空行和 # 开头的注释。环境变量已有值时不会被覆盖。
 func loadDotEnv(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -66,7 +68,6 @@ func loadDotEnv(path string) error {
 		}
 		key := strings.TrimSpace(parts[0])
 		val := strings.TrimSpace(parts[1])
-		// Only set if not already in environment
 		if os.Getenv(key) == "" {
 			os.Setenv(key, val)
 		}

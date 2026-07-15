@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Logger logs each incoming HTTP request with method, path, status, and duration.
+// Logger 记录每个 HTTP 请求的方法、路径、状态码和耗时。
 func Logger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -26,7 +26,7 @@ func (sw *statusWriter) WriteHeader(code int) {
 	sw.ResponseWriter.WriteHeader(code)
 }
 
-// CORS sets allowed origins for cross-origin requests (used by the chat API).
+// CORS 设置跨域访问头部，供聊天 API 使用。
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")

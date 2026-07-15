@@ -181,7 +181,7 @@
 
         var rows = tableWrap.querySelectorAll('tbody tr');
         if (rows.length === 0) {
-          tableWrap.innerHTML = '<div class="empty-state"><p>📝 暂无文章</p><p class="empty-hint">使用左侧表单发布第一篇吧 🚀</p></div>';
+          tableWrap.innerHTML = '<div class="empty-state"><p>暂无文章</p><p class="empty-hint">使用左侧表单发布第一篇吧</p></div>';
         }
 
         var countSpan = document.querySelector('.admin-list .count');

@@ -78,7 +78,7 @@
       srcDiv.className = 'chat-sources';
       var srcTitle = document.createElement('div');
       srcTitle.className = 'chat-sources-title';
-      srcTitle.textContent = '📚 参考来源 (' + sources.length + ')';
+      srcTitle.textContent = '参考来源 (' + sources.length + ')';
       srcTitle.addEventListener('click', function () {
         srcDiv.classList.toggle('expanded');
       });
@@ -99,7 +99,7 @@
     if (isError) {
       var retryBtn = document.createElement('button');
       retryBtn.className = 'chat-retry';
-      retryBtn.textContent = '🔄 重试';
+      retryBtn.textContent = '重试';
       retryBtn.addEventListener('click', function () {
         div.remove();
         sendMessage(lastQuestion);
@@ -161,7 +161,7 @@
       })
       .catch(function (err) {
         hideLoading();
-        addMessage('assistant', '抱歉，出错了 😅\n\n' + escapeHtml(err.message), null, true);
+        addMessage('assistant', '抱歉，出错了。\n\n' + escapeHtml(err.message), null, true);
       });
   }
 

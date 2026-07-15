@@ -1,25 +1,25 @@
 {{define "content"}}
 {{if .HasArticles}}
 <section class="hero hero-sm">
-    <h1>📚 探索知识，与 AI 对话</h1>
+    <h1>探索知识，与 AI 对话</h1>
     <p>浏览最新文章，或向 AI 助手提问，它会基于文章内容为你解答。</p>
 </section>
 
 <section class="recent-articles">
-    <h2>📌 最新文章</h2>
+    <h2>最新文章</h2>
     <div class="article-list">
         {{range .Articles}}
         <article class="article-card">
             <h3><a href="/articles/{{.ID}}">{{.Title}}</a></h3>
             <div class="article-meta">
-                <span>✍️ {{.Author}}</span>
-                <span>📅 {{.CreatedAt.Format "2006-01-02"}}</span>
+                <span>作者 {{.Author}}</span>
+                <span>日期 {{.CreatedAt.Format "2006-01-02"}}</span>
                 {{if .Tags}}
-                <span>🏷️ {{range $i, $t := .Tags}}{{if $i}}, {{end}}{{$t}}{{end}}</span>
+                <span>标签 {{range $i, $t := .Tags}}{{if $i}}, {{end}}{{$t}}{{end}}</span>
                 {{end}}
             </div>
             <p class="article-excerpt">{{printf "%.200s" .Content}}...</p>
-            <a href="/articles/{{.ID}}" class="read-more">阅读全文 →</a>
+            <a href="/articles/{{.ID}}" class="read-more">阅读全文</a>
         </article>
         {{end}}
     </div>
@@ -30,7 +30,7 @@
 </section>
 {{else}}
 <section class="hero">
-    <h1>📚 探索知识，与 AI 对话</h1>
+    <h1>探索知识，与 AI 对话</h1>
     <p>本站文章由 AI 辅助整理。阅读文章时，您可以随时向智能助手提问，它会基于文章内容为您解答。</p>
     <div class="hero-actions">
         <a href="/articles" class="btn btn-primary">浏览文章</a>
@@ -40,15 +40,15 @@
 
 <section class="features">
     <div class="feature-card">
-        <h3>📝 文章阅读</h3>
+        <h3>文章阅读</h3>
         <p>丰富的技术文章，涵盖多个领域</p>
     </div>
     <div class="feature-card">
-        <h3>🤖 智能问答</h3>
+        <h3>智能问答</h3>
         <p>基于文章内容的 AI 助手，有问必答</p>
     </div>
     <div class="feature-card">
-        <h3>⚡ 即时响应</h3>
+        <h3>即时响应</h3>
         <p>大模型驱动，秒级响应你的提问</p>
     </div>
 </section>

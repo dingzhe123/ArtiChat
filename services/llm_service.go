@@ -9,9 +9,7 @@ import (
 	"time"
 )
 
-// --- message types ---
-
-// ChatMessage is a message in the OpenAI chat format.
+// ChatMessage 是 OpenAI 格式的对话消息。
 type ChatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
@@ -47,19 +45,17 @@ type embedResponse struct {
 	} `json:"error,omitempty"`
 }
 
-// --- client ---
-
-// LLMClient calls an OpenAI-compatible API.
+// LLMClient 封装 OpenAI 兼容 API 的调用。
 type LLMClient struct {
 	apiKey     string
 	baseURL    string
 	model      string
 	embedModel string
-	client     *http.Client // long timeout for chat
-	embClient  *http.Client // short timeout for embeddings
+	client     *http.Client // 长超时（Chat）
+	embClient  *http.Client // 短超时（Embedding）
 }
 
-// NewLLMClient creates a new LLM API client.
+// NewLLMClient 创建大模型 API 客户端。
 func NewLLMClient(apiKey, baseURL, model, embedModel string) *LLMClient {
 	return &LLMClient{
 		apiKey:     apiKey,
@@ -71,7 +67,7 @@ func NewLLMClient(apiKey, baseURL, model, embedModel string) *LLMClient {
 	}
 }
 
-// Chat sends a list of messages and returns the assistant reply (non-streaming).
+// Chat 发送对话消息，返回助理的回复（非流式）。
 func (c *LLMClient) Chat(messages []ChatMessage) (string, error) {
 	body := chatRequest{
 		Model:       c.model,
@@ -80,25 +76,25 @@ func (c *LLMClient) Chat(messages []ChatMessage) (string, error) {
 		Stream:      false,
 	}
 
-	resp, err := c.doJSON("POST", c.baseURL+"/chat/completions", body)
+	resp, err := c.doJSON(c.client, "POST", c.baseURL+"/chat/completions", body)
 	if err != nil {
 		return "", err
 	}
 
 	var cr chatResponse
 	if err := json.Unmarshal(resp, &cr); err != nil {
-		return "", fmt.Errorf("parse chat response: %w", err)
+		return "", fmt.Errorf("解析 Chat 响应: %w", err)
 	}
 	if cr.Error != nil {
-		return "", fmt.Errorf("LLM error: %s", cr.Error.Message)
+		return "", fmt.Errorf("LLM 错误: %s", cr.Error.Message)
 	}
 	if len(cr.Choices) == 0 {
-		return "", fmt.Errorf("LLM returned no choices")
+		return "", fmt.Errorf("LLM 未返回任何选项")
 	}
 	return cr.Choices[0].Message.Content, nil
 }
 
-// ChatStream sends a streaming chat request and writes SSE events to w.
+// ChatStream 发送流式对话请求，将 SSE 事件直接写入 w。
 func (c *LLMClient) ChatStream(messages []ChatMessage, w http.ResponseWriter) error {
 	body := chatRequest{
 		Model:       c.model,
@@ -122,60 +118,53 @@ func (c *LLMClient) ChatStream(messages []ChatMessage, w http.ResponseWriter) er
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("chat stream: %w", err)
+		return fmt.Errorf("流式请求: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("LLM stream status %d: %s", resp.StatusCode, string(b))
+		return fmt.Errorf("LLM 流式错误 %d: %s", resp.StatusCode, string(b))
 	}
 
-	// Copy SSE stream directly to client
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	w.WriteHeader(http.StatusOK)
 
 	if _, err := io.Copy(w, resp.Body); err != nil {
-		return fmt.Errorf("copy stream: %w", err)
+		return fmt.Errorf("复制流: %w", err)
 	}
 	return nil
 }
 
-// Embed returns the embedding vector for the given text.
-// Uses a short timeout so fallback to keyword search happens quickly.
+// Embed 返回文本的 Embedding 向量，使用短超时以便快速回退。
 func (c *LLMClient) Embed(text string) ([]float64, error) {
 	body := embedRequest{
 		Model: c.embedModel,
 		Input: text,
 	}
 
-	resp, err := c.doJSONWithClient(c.embClient, "POST", c.baseURL+"/embeddings", body)
+	resp, err := c.doJSON(c.embClient, "POST", c.baseURL+"/embeddings", body)
 	if err != nil {
 		return nil, err
 	}
 
 	var er embedResponse
 	if err := json.Unmarshal(resp, &er); err != nil {
-		return nil, fmt.Errorf("parse embed response: %w", err)
+		return nil, fmt.Errorf("解析 Embedding 响应: %w", err)
 	}
 	if er.Error != nil {
-		return nil, fmt.Errorf("Embedding error: %s", er.Error.Message)
+		return nil, fmt.Errorf("Embedding 错误: %s", er.Error.Message)
 	}
 	if len(er.Data) == 0 {
-		return nil, fmt.Errorf("no embedding returned")
+		return nil, fmt.Errorf("未返回 Embedding 数据")
 	}
 	return er.Data[0].Embedding, nil
 }
 
-// --- helpers ---
-
-func (c *LLMClient) doJSON(method, url string, body interface{}) ([]byte, error) {
-	return c.doJSONWithClient(c.client, method, url, body)
-}
-
-func (c *LLMClient) doJSONWithClient(client *http.Client, method, url string, body interface{}) ([]byte, error) {
+// doJSON 使用默认客户端发送 JSON 请求。
+func (c *LLMClient) doJSON(client *http.Client, method, url string, body interface{}) ([]byte, error) {
 	reqBytes, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -190,17 +179,17 @@ func (c *LLMClient) doJSONWithClient(client *http.Client, method, url string, bo
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("http %s %s: %w", method, url, err)
+		return nil, fmt.Errorf("HTTP %s %s: %w", method, url, err)
 	}
 	defer resp.Body.Close()
 
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read body: %w", err)
+		return nil, fmt.Errorf("读取响应体: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("LLM API status %d: %s", resp.StatusCode, string(b))
+		return nil, fmt.Errorf("LLM API 状态 %d: %s", resp.StatusCode, string(b))
 	}
 	return b, nil
 }

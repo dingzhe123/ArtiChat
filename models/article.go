@@ -2,18 +2,18 @@ package models
 
 import "time"
 
-// Article represents a published article.
+// Article 表示一篇已发布的文章。
 type Article struct {
 	ID        int64     `json:"id"`
 	Title     string    `json:"title"`
-	Content   string    `json:"content"` // Markdown
+	Content   string    `json:"content"` // Markdown 格式
 	Author    string    `json:"author"`
 	Tags      []string  `json:"tags"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// ArticleChunk is a text segment with its vector embedding, used for RAG retrieval.
+// ArticleChunk 是文章的文本片段及其向量嵌入，用于 RAG 检索。
 type ArticleChunk struct {
 	ID        int64     `json:"id"`
 	ArticleID int64     `json:"article_id"`

@@ -18,18 +18,18 @@ import (
 
 const (
 	maxArticleBodySize = 1 << 20 // 1 MB
-	charsPerMinute     = 400     // avg reading speed for Chinese
+	charsPerMinute     = 400     // 中文平均阅读速度（字/分钟）
 )
 
-// ArticleHandler handles article pages and API.
+// ArticleHandler 处理文章页面和 API 请求。
 type ArticleHandler struct {
 	ListTmpl   *template.Template
 	DetailTmpl *template.Template
 	Service    *services.ArticleService
-	RAG        *services.RAGService // optional — set to enable auto-indexing
+	RAG        *services.RAGService // 可选：设置后自动在增删改时维护索引
 }
 
-// List renders the article list page — GET /articles.
+// List 渲染文章列表页 — GET /articles。
 func (h *ArticleHandler) List(w http.ResponseWriter, r *http.Request) {
 	articles, err := h.Service.List()
 	if err != nil {
@@ -51,7 +51,7 @@ func (h *ArticleHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Detail renders a single article page — GET /articles/{id}.
+// Detail 渲染单篇文章详情页 — GET /articles/{id}。
 func (h *ArticleHandler) Detail(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
@@ -65,14 +65,14 @@ func (h *ArticleHandler) Detail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Render Markdown → HTML
+	// Markdown → HTML
 	var buf bytes.Buffer
 	if err := goldmark.Convert([]byte(article.Content), &buf); err != nil {
 		http.Error(w, "内容渲染失败", http.StatusInternalServerError)
 		return
 	}
 
-	// Plain-text description + reading time
+	// 纯文本描述 + 预估阅读时间
 	desc := truncate(stripMarkdown(article.Content), 160)
 	charCount := len([]rune(article.Content))
 	readMin := int(math.Ceil(float64(charCount) / float64(charsPerMinute)))
@@ -99,7 +99,7 @@ func (h *ArticleHandler) Detail(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetArticle returns a single article as JSON — GET /api/articles/{id}.
+// GetArticle 返回单篇文章的 JSON — GET /api/articles/{id}。
 func (h *ArticleHandler) GetArticle(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
@@ -120,7 +120,7 @@ func (h *ArticleHandler) GetArticle(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "data": article})
 }
 
-// Create handles article creation — POST /api/articles.
+// Create 处理文章创建 — POST /api/articles。
 func (h *ArticleHandler) Create(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxArticleBodySize)
 	var a models.Article
@@ -139,7 +139,7 @@ func (h *ArticleHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	id, err := h.Service.Create(&a)
 	if err != nil {
-		log.Printf("ERROR: create article: %v", err)
+		log.Printf("创建文章失败: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
 			"ok": false, "error": "创建文章失败",
 		})
@@ -147,14 +147,14 @@ func (h *ArticleHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.ID = id
-	// Auto-index the new article
+	// 异步生成向量索引
 	if h.RAG != nil {
 		go func() { _ = h.RAG.IndexArticle(&a) }()
 	}
 	writeJSON(w, http.StatusCreated, map[string]interface{}{"ok": true, "data": a})
 }
 
-// Update handles article update — PUT /api/articles/{id}.
+// Update 处理文章更新 — PUT /api/articles/{id}。
 func (h *ArticleHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
@@ -175,7 +175,7 @@ func (h *ArticleHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	a.ID = id
 	if err := h.Service.Update(&a); err != nil {
-		log.Printf("ERROR: update article %d: %v", id, err)
+		log.Printf("更新文章 %d 失败: %v", id, err)
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
 			"ok": false, "error": "更新文章失败",
 		})
@@ -183,14 +183,14 @@ func (h *ArticleHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updated, _ := h.Service.GetByID(id)
-	// Re-index the updated article
+	// 重新索引更新后的文章
 	if h.RAG != nil && updated != nil {
 		go func() { _ = h.RAG.IndexArticle(updated) }()
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "data": updated})
 }
 
-// Delete handles article deletion — DELETE /api/articles/{id}.
+// Delete 处理文章删除 — DELETE /api/articles/{id}。
 func (h *ArticleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
@@ -201,22 +201,21 @@ func (h *ArticleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.Service.Delete(id); err != nil {
-		log.Printf("ERROR: delete article %d: %v", id, err)
+		log.Printf("删除文章 %d 失败: %v", id, err)
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
 			"ok": false, "error": "删除文章失败",
 		})
 		return
 	}
 
-	// Remove associated chunks
+	// 清理关联的向量片段
 	if h.RAG != nil {
 		_ = h.RAG.DeleteChunks(id)
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
 }
 
-// --- helpers ---
-
+// writeJSON 以 JSON 格式写入响应。
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)

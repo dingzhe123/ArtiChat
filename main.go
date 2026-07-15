@@ -11,9 +11,8 @@ import (
 	"ai-article-site/services"
 )
 
-// parseSet parses base.html plus the given content template files into a
-// single template set.  Each set gets its own "content" definition, avoiding
-// the name collision you get with ParseGlob.
+// parseSet 将 base.html 与指定的内容模板文件解析为一个模板集。
+// 每个模板集拥有独立的 "content" 定义，避免 ParseGlob 带来的命名冲突。
 func parseSet(contentFiles ...string) *template.Template {
 	paths := append([]string{"templates/base.html"}, contentFiles...)
 	return template.Must(template.ParseFiles(paths...))
@@ -22,30 +21,29 @@ func parseSet(contentFiles ...string) *template.Template {
 func main() {
 	cfg := config.Load()
 
-	// Initialize services
+	// 初始化各服务
 	articleSvc, err := services.NewArticleService(cfg.DBPath)
 	if err != nil {
-		log.Fatalf("failed to init article service: %v", err)
+		log.Fatalf("初始化文章服务失败: %v", err)
 	}
 	defer articleSvc.Close()
 
-	// LLM client
+	// 大模型客户端
 	llmClient := services.NewLLMClient(cfg.LLMAPIKey, cfg.LLMBaseURL, cfg.LLMModel, cfg.EmbeddingModel)
 
-	// RAG service
+	// RAG 检索服务
 	ragSvc, err := services.NewRAGService(articleSvc.DB(), llmClient)
 	if err != nil {
-		log.Fatalf("failed to init RAG service: %v", err)
+		log.Fatalf("初始化 RAG 服务失败: %v", err)
 	}
 
-	// Per-handler template sets — each set includes base.html plus exactly
-	// one content template, so {{block "content"}} resolves to the right page.
+	// 为每个处理器构建独立的模板集，确保 {{block "content"}} 解析到正确的页面。
 	homeTmpl := parseSet("templates/home.html")
 	articlesListTmpl := parseSet("templates/article_list.html")
 	articlesDetailTmpl := parseSet("templates/article_detail.html")
 	adminTmpl := parseSet("templates/admin.html")
 
-	// Handlers
+	// 各处理器
 	homeH := &handlers.HomeHandler{Tmpl: homeTmpl, Service: articleSvc}
 	articleH := &handlers.ArticleHandler{
 		ListTmpl:   articlesListTmpl,
@@ -60,41 +58,41 @@ func main() {
 		ArticleService: articleSvc,
 	}
 
-	// Basic Auth wrapper for admin routes
+	// 管理后台 Basic Auth 保护
 	auth := handlers.BasicAuth(cfg.AdminUser, cfg.AdminPass)
 
-	// Router — using Go 1.22+ enhanced ServeMux with method-based routing.
+	// 路由注册（Go 1.22+ 增强路由，支持 HTTP 方法匹配）
 	mux := http.NewServeMux()
 
-	// Public pages
+	// 公开页面
 	mux.HandleFunc("GET /", homeH.ServeHTTP)
 	mux.HandleFunc("GET /articles", articleH.List)
 	mux.HandleFunc("GET /articles/{id}", articleH.Detail)
 
-	// Admin pages (protected)
+	// 管理后台（需认证）
 	mux.HandleFunc("GET /admin", auth(adminH.Page))
 
-	// API — article CRUD (protected)
+	// 文章 CRUD API（需认证）
 	mux.HandleFunc("GET /api/articles/{id}", auth(articleH.GetArticle))
 	mux.HandleFunc("POST /api/articles", auth(articleH.Create))
 	mux.HandleFunc("PUT /api/articles/{id}", auth(articleH.Update))
 	mux.HandleFunc("DELETE /api/articles/{id}", auth(articleH.Delete))
 
-	// API — chat (public)
+	// 智能问答 API（公开）
 	mux.HandleFunc("POST /api/chat", chatH.HandleChat)
 
-	// API — reindex (protected)
+	// 重建索引 API（需认证）
 	mux.HandleFunc("POST /api/reindex", auth(chatH.HandleReindex))
 
-	// Static files
+	// 静态文件服务
 	fs := http.FileServer(http.Dir("static"))
 	mux.Handle("GET /static/", http.StripPrefix("/static/", fs))
 
-	// Apply middleware: CORS → Logger → Router
+	// 应用中间件: CORS → 日志 → 路由
 	handler := middleware.Logger(middleware.CORS(mux))
 
-	log.Printf("🚀 Server starting on http://localhost:%s", cfg.Port)
+	log.Printf("服务器已启动 http://localhost:%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, handler); err != nil {
-		log.Fatalf("server error: %v", err)
+		log.Fatalf("服务器异常退出: %v", err)
 	}
 }

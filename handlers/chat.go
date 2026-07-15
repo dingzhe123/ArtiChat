@@ -11,38 +11,38 @@ import (
 )
 
 const (
-	maxChatBodySize     = 32 << 10 // 32 KB
-	maxQuestionLen      = 2000     // characters
-	maxContextChunks     = 5
+	maxChatBodySize = 32 << 10 // 32 KB
+	maxQuestionLen  = 2000     // 字符
+	maxContextChunks = 5
 )
 
-// ChatHandler handles the Q&A chat API.
+// ChatHandler 处理智能问答 API。
 type ChatHandler struct {
 	RAG            *services.RAGService
 	LLM            *services.LLMClient
 	ArticleService *services.ArticleService
 }
 
-// ChatRequest is the JSON body for a chat request.
+// ChatRequest 是聊天请求的 JSON 结构。
 type ChatRequest struct {
 	Question string `json:"question"`
 	Stream   bool   `json:"stream"`
 }
 
-// ChatResponse is the JSON body for a chat response.
+// ChatResponse 是聊天响应的 JSON 结构。
 type ChatResponse struct {
 	Answer  string       `json:"answer"`
 	Sources []ChatSource `json:"sources,omitempty"`
 }
 
-// ChatSource is a reference to a chunk used in the answer.
+// ChatSource 是回答所引用的文章片段。
 type ChatSource struct {
 	ArticleID int64   `json:"article_id"`
 	Content   string  `json:"content"`
 	Score     float64 `json:"score"`
 }
 
-// HandleChat processes a chat request — POST /api/chat.
+// HandleChat 处理问答请求 — POST /api/chat。
 func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxChatBodySize)
 
@@ -68,17 +68,17 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. Retrieve relevant chunks via RAG
+	// 1. RAG 检索相关文章片段
 	results, err := h.RAG.Search(question, maxContextChunks)
 	if err != nil {
-		log.Printf("ERROR: RAG search failed: %v", err)
+		log.Printf("RAG 检索失败: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
 			"ok": false, "error": "检索失败，请稍后重试",
 		})
 		return
 	}
 
-	// 2. Build context from retrieved chunks
+	// 2. 构建上下文和来源列表
 	var contextBuilder strings.Builder
 	var sources []ChatSource
 	for _, r := range results {
@@ -92,7 +92,7 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	}
 	context := contextBuilder.String()
 
-	// 3. Build prompt with context
+	// 3. 组装 Prompt
 	systemPrompt := `你是一个知识助手，请根据以下文章内容回答用户的问题。
 
 ## 相关文章片段
@@ -110,17 +110,17 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 		{Role: "user", Content: question},
 	}
 
-	// 4. Streaming or non-streaming
+	// 4. 流式或非流式调用
 	if req.Stream {
 		if err := h.LLM.ChatStream(messages, w); err != nil {
-			log.Printf("ERROR: LLM stream failed: %v", err)
+			log.Printf("LLM 流式调用失败: %v", err)
 		}
 		return
 	}
 
 	answer, err := h.LLM.Chat(messages)
 	if err != nil {
-		log.Printf("ERROR: LLM chat failed: %v", err)
+		log.Printf("LLM 调用失败: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
 			"ok": false, "error": "AI 服务暂时不可用，请稍后重试",
 		})
@@ -133,7 +133,7 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// HandleReindex rebuilds the vector index for all articles — POST /api/reindex.
+// HandleReindex 重建所有文章的向量索引 — POST /api/reindex。
 func (h *ChatHandler) HandleReindex(w http.ResponseWriter, r *http.Request) {
 	if h.ArticleService == nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
@@ -143,7 +143,7 @@ func (h *ChatHandler) HandleReindex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.RAG.ReindexAll(h.ArticleService); err != nil {
-		log.Printf("ERROR: reindex failed: %v", err)
+		log.Printf("重建索引失败: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
 			"ok": false, "error": "重建索引失败，请稍后重试",
 		})

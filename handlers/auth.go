@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// BasicAuth returns a middleware that protects handler with HTTP Basic Auth.
+// BasicAuth 返回一个 HTTP Basic Auth 中间件，使用给定的用户名密码保护处理器。
 func BasicAuth(user, pass string) func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
