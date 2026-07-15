@@ -1,0 +1,22 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+ai-article-site
+
+# Database
+data/site.db
+*.db
+
+# IDE
+.vscode/
+.idea/
+
+# Project docs (local only)
+CLAUDE.md
+
+# OS
+.DS_Store
+Thumbs.db
