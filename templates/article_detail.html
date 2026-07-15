@@ -1,0 +1,20 @@
+{{define "content"}}
+<article class="article-detail">
+    <header class="article-header">
+        <h1>{{.Article.Title}}</h1>
+        <div class="article-meta">
+            <span>✍️ {{.Article.Author}}</span>
+            <span>📅 {{.Article.CreatedAt.Format "2006-01-02"}}</span>
+            {{if .Article.Tags}}
+            <span>🏷️ {{range $i, $t := .Article.Tags}}{{if $i}}, {{end}}{{$t}}{{end}}</span>
+            {{end}}
+        </div>
+    </header>
+    <div class="article-body">
+        {{.ContentHTML}}
+    </div>
+    <footer class="article-footer">
+        <a href="/articles">← 返回文章列表</a>
+    </footer>
+</article>
+{{end}}

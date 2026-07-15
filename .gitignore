@@ -8,6 +8,7 @@ ai-article-site
 
 # Database
 data/site.db
+data/site.db-*
 *.db
 
 # IDE

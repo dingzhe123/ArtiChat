@@ -5,10 +5,12 @@ import (
 	"net/http"
 )
 
+// HomeHandler serves the homepage.
 type HomeHandler struct {
 	Tmpl *template.Template
 }
 
+// ServeHTTP renders the home page — GET /.
 func (h *HomeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	data := map[string]interface{}{
 		"Title":       "AI 智能文章站 — 探索知识，与 AI 对话",

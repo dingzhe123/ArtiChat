@@ -1,0 +1,26 @@
+{{define "content"}}
+<h2>📚 所有文章</h2>
+
+{{if .Articles}}
+<div class="article-list">
+    {{range .Articles}}
+    <article class="article-card">
+        <h3><a href="/articles/{{.ID}}">{{.Title}}</a></h3>
+        <div class="article-meta">
+            <span>✍️ {{.Author}}</span>
+            <span>📅 {{.CreatedAt.Format "2006-01-02"}}</span>
+            {{if .Tags}}
+            <span>🏷️ {{range $i, $t := .Tags}}{{if $i}}, {{end}}{{$t}}{{end}}</span>
+            {{end}}
+        </div>
+        <p class="article-excerpt">{{printf "%.200s" .Content}}...</p>
+        <a href="/articles/{{.ID}}" class="read-more">阅读全文 →</a>
+    </article>
+    {{end}}
+</div>
+{{else}}
+<div class="empty-state">
+    <p>📭 暂无文章，请前往<a href="/admin">管理后台</a>发布。</p>
+</div>
+{{end}}
+{{end}}

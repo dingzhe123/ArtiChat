@@ -1,0 +1,74 @@
+{{define "content"}}
+<div class="admin-panel">
+    <h2>📝 文章管理</h2>
+
+    <div class="admin-layout">
+        <!-- Form -->
+        <div class="admin-form card">
+            <h3 id="form-title">新建文章</h3>
+            <form id="article-form">
+                <input type="hidden" id="article-id">
+                <div class="form-group">
+                    <label for="title">标题</label>
+                    <input type="text" id="title" class="form-input" placeholder="文章标题" required>
+                </div>
+                <div class="form-group">
+                    <label for="author">作者</label>
+                    <input type="text" id="author" class="form-input" placeholder="作者名" required>
+                </div>
+                <div class="form-group">
+                    <label for="tags">标签（逗号分隔）</label>
+                    <input type="text" id="tags" class="form-input" placeholder="例如: Go, AI, 教程">
+                </div>
+                <div class="form-group">
+                    <label for="content">内容（Markdown）</label>
+                    <textarea id="content" class="form-input form-textarea" rows="15" placeholder="Markdown 格式内容..." required></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="submit-btn">发布文章</button>
+                    <button type="button" class="btn btn-secondary" id="cancel-btn">取消编辑</button>
+                </div>
+            </form>
+            <div id="form-msg" class="form-msg" style="display:none;"></div>
+        </div>
+
+        <!-- Article List -->
+        <div class="admin-list card">
+            <h3>已发布文章 <span class="count">({{len .Articles}})</span></h3>
+            <div id="article-table-wrap">
+                {{if .Articles}}
+                <table class="article-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>标题</th>
+                            <th>作者</th>
+                            <th>日期</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Articles}}
+                        <tr data-id="{{.ID}}">
+                            <td>{{.ID}}</td>
+                            <td><a href="/articles/{{.ID}}">{{.Title}}</a></td>
+                            <td>{{.Author}}</td>
+                            <td>{{.CreatedAt.Format "2006-01-02"}}</td>
+                            <td class="actions">
+                                <button class="btn btn-small btn-edit" data-id="{{.ID}}">编辑</button>
+                                <button class="btn btn-small btn-delete" data-id="{{.ID}}">删除</button>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+                {{else}}
+                <p class="empty-msg">暂无文章，使用左侧表单发布第一篇吧 🚀</p>
+                {{end}}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/admin.js"></script>
+{{end}}
