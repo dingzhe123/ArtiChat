@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strings"
 	"unicode"
-	"unicode/utf8"
 
 	"ai-article-site/models"
 )
@@ -205,7 +204,7 @@ func (s *RAGService) embeddingSearch(query string) ([]SearchResult, error) {
 	return results, rows.Err()
 }
 
-// keywordSearch uses TF-like word overlap to score chunks.
+// keywordSearch scores chunks by bigram overlap + exact match bonus.
 func (s *RAGService) keywordSearch(query string, topK int) ([]SearchResult, error) {
 	rows, err := s.db.Query("SELECT id, article_id, chunk_idx, content, embedding FROM article_chunks")
 	if err != nil {
@@ -213,7 +212,12 @@ func (s *RAGService) keywordSearch(query string, topK int) ([]SearchResult, erro
 	}
 	defer rows.Close()
 
-	queryWords := tokenize(query)
+	queryTokens := tokenizeBigrams(query)
+	if len(queryTokens) == 0 {
+		return nil, nil
+	}
+	querySet := toSet(queryTokens)
+	queryLower := strings.ToLower(query)
 
 	var results []SearchResult
 	for rows.Next() {
@@ -223,19 +227,46 @@ func (s *RAGService) keywordSearch(query string, topK int) ([]SearchResult, erro
 			continue
 		}
 
-		if len(queryWords) == 0 {
-			continue
-		}
-
+		chunkTokens := tokenizeBigrams(c.Content)
+		chunkSet := toSet(chunkTokens)
 		chunkLower := strings.ToLower(c.Content)
-		hits := 0
-		for _, w := range queryWords {
-			if strings.Contains(chunkLower, w) {
-				hits++
+
+		// 1. Token overlap — query coverage ratio
+		intersection := 0
+		for t := range querySet {
+			if chunkSet[t] {
+				intersection++
 			}
 		}
-		score := float64(hits) / float64(len(queryWords))
-		if score > 0 {
+		score := float64(intersection) / float64(len(querySet))
+
+		// 2. Longest common substring (Chinese-aware, minimum 3 chars)
+		lcsLen := longestCommonSubstring(queryLower, chunkLower)
+		if lcsLen >= 6 {
+			score += 0.4
+		} else if lcsLen >= 4 {
+			score += 0.25
+		} else if lcsLen >= 3 {
+			score += 0.1
+		}
+
+		// 3. Title match bonus — query words in article title look-alike
+		if len(queryTokens) > 0 {
+			titleLower := strings.ToLower(chunkLower)
+			titleTokens := tokenizeBigrams(titleLower)
+			titleSet := toSet(titleTokens)
+			titleHits := 0
+			for t := range querySet {
+				if titleSet[t] {
+					titleHits++
+				}
+			}
+			if titleHits > 0 {
+				score += 0.15 * float64(titleHits) / float64(len(querySet))
+			}
+		}
+
+		if score > 0.01 {
 			results = append(results, SearchResult{Chunk: c, Similarity: score})
 		}
 	}
@@ -244,6 +275,39 @@ func (s *RAGService) keywordSearch(query string, topK int) ([]SearchResult, erro
 	}
 
 	return topKResults(results, topK), nil
+}
+
+// longestCommonSubstring returns the length of the longest common substring
+// between a and b (as rune count). Simple O(n*m) DP for short strings.
+func longestCommonSubstring(a, b string) int {
+	ra, rb := []rune(a), []rune(b)
+	if len(ra) == 0 || len(rb) == 0 {
+		return 0
+	}
+	// Use 1D DP to save memory
+	prev := make([]int, len(rb)+1)
+	maxLen := 0
+	for i := 1; i <= len(ra); i++ {
+		curr := make([]int, len(rb)+1)
+		for j := 1; j <= len(rb); j++ {
+			if ra[i-1] == rb[j-1] {
+				curr[j] = prev[j-1] + 1
+				if curr[j] > maxLen {
+					maxLen = curr[j]
+				}
+			}
+		}
+		prev = curr
+	}
+	return maxLen
+}
+
+func toSet(tokens []string) map[string]bool {
+	s := make(map[string]bool, len(tokens))
+	for _, t := range tokens {
+		s[t] = true
+	}
+	return s
 }
 
 func topKResults(results []SearchResult, topK int) []SearchResult {
@@ -256,44 +320,96 @@ func topKResults(results []SearchResult, topK int) []SearchResult {
 	return results[:topK]
 }
 
-// --- tokenization ---
+// --- tokenization (bigram-based) ---
 
-// tokenize splits text into search tokens.
-// For Chinese, each character is a token. For English, words are tokens.
-func tokenize(text string) []string {
+// Common Chinese stop characters and words — filtered from tokens.
+var stopChars = map[string]bool{
+	"的": true, "了": true, "是": true, "在": true, "和": true,
+	"与": true, "或": true, "也": true, "都": true, "就": true,
+	"而": true, "及": true, "且": true, "但": true, "所": true,
+	"为": true, "以": true, "之": true, "其": true, "这": true,
+	"那": true, "等": true, "被": true, "把": true, "从": true,
+	"到": true, "对": true, "向": true, "让": true, "用": true,
+	"还": true, "要": true, "会": true, "能": true, "可": true,
+	"很": true, "着": true, "过": true, "地": true, "得": true,
+	"吗": true, "呢": true, "吧": true, "啊": true, "嗯": true,
+	"么": true, "怎": true, "哪": true, "什": true, "谁": true,
+	"有": true, "不": true, "没": true, "个": true, "一": true,
+	"来": true, "去": true, "说": true, "看": true, "想": true,
+	"做": true, "上": true, "下": true, "中": true,
+	"可以": true, "什么": true, "怎么": true, "为什么": true,
+	"一个": true, "这个": true, "那个": true, "哪个": true,
+	"一些": true, "一种": true, "一下": true, "自己": true,
+	"知道": true, "没有": true, "他们": true, "我们": true,
+	"如果": true, "因为": true, "所以": true,
+	"但是": true, "然后": true, "不过": true, "还是": true,
+	"已经": true, "可能": true, "应该": true, "需要": true,
+	"这些": true, "那些": true, "如何": true,
+	"对于": true, "关于": true, "以及": true, "并且": true,
+}
+
+// tokenizeBigrams generates mixed bigrams: character bigrams for Chinese,
+// whole words for English. Filters stop characters and bigrams.
+func tokenizeBigrams(text string) []string {
+	text = strings.ToLower(text)
 	var tokens []string
 	var current strings.Builder
+	var hanBuf []rune
 
-	for _, r := range strings.ToLower(text) {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			current.WriteRune(r)
-		} else if unicode.Is(unicode.Han, r) {
-			// Flush current English word
-			if current.Len() > 0 {
-				tokens = append(tokens, current.String())
-				current.Reset()
+	flushEnglish := func() {
+		if current.Len() > 0 {
+			w := current.String()
+			if len(w) >= 2 && !stopChars[w] {
+				tokens = append(tokens, w)
 			}
-			tokens = append(tokens, string(r))
-		} else {
-			if current.Len() > 0 {
-				tokens = append(tokens, current.String())
-				current.Reset()
-			}
+			current.Reset()
 		}
 	}
-	if current.Len() > 0 {
-		tokens = append(tokens, current.String())
+	flushHan := func() {
+		for _, r := range hanBuf {
+			c := string(r)
+			if !stopChars[c] {
+				tokens = append(tokens, c) // unigram
+			}
+		}
+		if len(hanBuf) >= 2 {
+			for i := 0; i < len(hanBuf)-1; i++ {
+				bigram := string(hanBuf[i]) + string(hanBuf[i+1])
+				c1, c2 := string(hanBuf[i]), string(hanBuf[i+1])
+				if stopChars[c1] && stopChars[c2] {
+					continue
+				}
+				if !stopChars[bigram] {
+					tokens = append(tokens, bigram) // bigram
+				}
+			}
+		}
+		hanBuf = nil
 	}
 
-	// Deduplicate and filter short tokens
+	for _, r := range text {
+		if unicode.Is(unicode.Han, r) {
+			flushEnglish()
+			hanBuf = append(hanBuf, r)
+		} else if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			flushHan()
+			current.WriteRune(r)
+		} else {
+			flushHan()
+			flushEnglish()
+		}
+	}
+	flushHan()
+	flushEnglish()
+
+	// Deduplicate
 	seen := make(map[string]bool)
 	var out []string
 	for _, t := range tokens {
-		if utf8.RuneCountInString(t) < 1 || seen[t] {
-			continue
+		if !seen[t] {
+			seen[t] = true
+			out = append(out, t)
 		}
-		seen[t] = true
-		out = append(out, t)
 	}
 	return out
 }

@@ -54,6 +54,37 @@
         </div>
     </footer>
 
+    <!-- AI Chat Widget -->
+    <div id="chat-widget" class="chat-widget">
+        <button id="chat-toggle" class="chat-toggle" aria-label="打开AI助手">
+            <span class="chat-toggle-icon">🤖</span>
+            <span class="chat-toggle-label">AI 助手</span>
+        </button>
+        <div id="chat-panel" class="chat-panel">
+            <div class="chat-header">
+                <span>🤖 AI 智能问答</span>
+                <span class="chat-subtitle">基于文章内容回答</span>
+                <button id="chat-close" class="chat-close" aria-label="关闭">✕</button>
+            </div>
+            <div id="chat-messages" class="chat-messages">
+                <div class="chat-message assistant">
+                    <div class="chat-bubble">
+                        你好！我是 AI 助手，可以基于已发布的文章回答你的问题。<br>试试问我文章里的内容吧 👋
+                    </div>
+                </div>
+            </div>
+            <div id="chat-loading" class="chat-loading">
+                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            </div>
+            <div class="chat-input-area">
+                <input id="chat-input" class="chat-input" type="text"
+                       placeholder="输入你的问题…" maxlength="2000"
+                       autocomplete="off" />
+                <button id="chat-send" class="chat-send" aria-label="发送">发送</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/chat.js"></script>
 </body>
 </html>

@@ -51,11 +51,12 @@ type embedResponse struct {
 
 // LLMClient calls an OpenAI-compatible API.
 type LLMClient struct {
-	apiKey  string
-	baseURL string
-	model   string
+	apiKey     string
+	baseURL    string
+	model      string
 	embedModel string
-	client  *http.Client
+	client     *http.Client // long timeout for chat
+	embClient  *http.Client // short timeout for embeddings
 }
 
 // NewLLMClient creates a new LLM API client.
@@ -66,6 +67,7 @@ func NewLLMClient(apiKey, baseURL, model, embedModel string) *LLMClient {
 		model:      model,
 		embedModel: embedModel,
 		client:     &http.Client{Timeout: 120 * time.Second},
+		embClient:  &http.Client{Timeout: 8 * time.Second},
 	}
 }
 
@@ -142,13 +144,14 @@ func (c *LLMClient) ChatStream(messages []ChatMessage, w http.ResponseWriter) er
 }
 
 // Embed returns the embedding vector for the given text.
+// Uses a short timeout so fallback to keyword search happens quickly.
 func (c *LLMClient) Embed(text string) ([]float64, error) {
 	body := embedRequest{
 		Model: c.embedModel,
 		Input: text,
 	}
 
-	resp, err := c.doJSON("POST", c.baseURL+"/embeddings", body)
+	resp, err := c.doJSONWithClient(c.embClient, "POST", c.baseURL+"/embeddings", body)
 	if err != nil {
 		return nil, err
 	}
@@ -169,6 +172,10 @@ func (c *LLMClient) Embed(text string) ([]float64, error) {
 // --- helpers ---
 
 func (c *LLMClient) doJSON(method, url string, body interface{}) ([]byte, error) {
+	return c.doJSONWithClient(c.client, method, url, body)
+}
+
+func (c *LLMClient) doJSONWithClient(client *http.Client, method, url string, body interface{}) ([]byte, error) {
 	reqBytes, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -181,7 +188,7 @@ func (c *LLMClient) doJSON(method, url string, body interface{}) ([]byte, error)
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("http %s %s: %w", method, url, err)
 	}
