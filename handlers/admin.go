@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 
@@ -21,8 +22,16 @@ func (h *AdminHandler) Page(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	canonical := canonicalURL(r, "/admin")
 	data := map[string]interface{}{
-		"Title":    "管理后台 — AI 智能文章站",
+		"Title":        "管理后台 — AI 智能文章站",
+		"Description":  "文章管理后台 — 创建、编辑、删除文章。",
+		"CanonicalURL": canonical,
+		"OGType":       "website",
+		"StructuredData": template.HTML(fmt.Sprintf(
+			`<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"管理后台","url":"%s"}</script>`,
+			canonical,
+		)),
 		"Articles": articles,
 	}
 	if err := h.Tmpl.ExecuteTemplate(w, "base.html", data); err != nil {

@@ -5,10 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}}</title>
     <meta name="description" content="{{.Description}}">
+    <link rel="canonical" href="{{.CanonicalURL}}">
+    <!-- Open Graph -->
     <meta property="og:title" content="{{.Title}}">
     <meta property="og:description" content="{{.Description}}">
-    <meta property="og:type" content="website">
+    <meta property="og:type" content="{{.OGType}}">
     <meta property="og:url" content="{{.CanonicalURL}}">
+    <meta property="og:site_name" content="AI 智能文章站">
+    {{if .OGImage}}<meta property="og:image" content="{{.OGImage}}">{{end}}
+    {{if .ArticleAuthor}}<meta property="article:author" content="{{.ArticleAuthor}}">{{end}}
+    {{if .ArticlePublished}}<meta property="article:published_time" content="{{.ArticlePublished}}">{{end}}
+    {{if .ArticleModified}}<meta property="article:modified_time" content="{{.ArticleModified}}">{{end}}
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{{.Title}}">
+    <meta name="twitter:description" content="{{.Description}}">
+    {{if .OGImage}}<meta name="twitter:image" content="{{.OGImage}}">{{end}}
+    <!-- Structured Data -->
+    {{.StructuredData}}
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>

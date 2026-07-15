@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"strconv"
+	"time"
 
 	"ai-article-site/models"
 	"ai-article-site/services"
@@ -28,10 +29,14 @@ func (h *ArticleHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	canonical := canonicalURL(r, "/articles")
 	data := map[string]interface{}{
-		"Title":       "文章列表 — AI 智能文章站",
-		"Description": "浏览所有已发布的文章。",
-		"Articles":    articles,
+		"Title":          "文章列表 — AI 智能文章站",
+		"Description":    "浏览所有已发布的文章。",
+		"CanonicalURL":   canonical,
+		"OGType":         "website",
+		"StructuredData": articleListStructuredData(canonical, articles),
+		"Articles":       articles,
 	}
 	if err := h.ListTmpl.ExecuteTemplate(w, "base.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -59,16 +64,21 @@ func (h *ArticleHandler) Detail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	desc := article.Content
-	if len(desc) > 160 {
-		desc = desc[:160] + "..."
-	}
+	// Plain-text description from markdown
+	desc := truncate(stripMarkdown(article.Content), 160)
 
+	canonical := canonicalURL(r, "/articles/"+strconv.FormatInt(article.ID, 10))
 	data := map[string]interface{}{
-		"Title":       article.Title + " — AI 智能文章站",
-		"Description": desc,
-		"Article":     article,
-		"ContentHTML": template.HTML(buf.String()),
+		"Title":            article.Title + " — AI 智能文章站",
+		"Description":      desc,
+		"CanonicalURL":     canonical,
+		"OGType":           "article",
+		"ArticleAuthor":    article.Author,
+		"ArticlePublished": article.CreatedAt.Format(time.RFC3339),
+		"ArticleModified":  article.UpdatedAt.Format(time.RFC3339),
+		"StructuredData":   articleDetailStructuredData(canonical, article, desc),
+		"Article":          article,
+		"ContentHTML":      template.HTML(buf.String()),
 	}
 	if err := h.DetailTmpl.ExecuteTemplate(w, "base.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
