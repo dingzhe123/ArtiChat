@@ -216,6 +216,33 @@ body {
     font-size: 1.1rem;
 }
 
+/* ==================== Pagination ==================== */
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 32px;
+}
+.pagination .page-link {
+    padding: 8px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: box-shadow 0.2s;
+}
+.pagination .page-link:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.pagination .page-info {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
 /* ==================== Breadcrumb ==================== */
 .breadcrumb {
     padding: 12px 0;

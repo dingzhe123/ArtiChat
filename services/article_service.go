@@ -113,6 +113,34 @@ func (s *ArticleService) List() ([]models.Article, error) {
 	return articles, rows.Err()
 }
 
+// ListPage 返回指定页的文章和文章总数，按创建时间降序排列。
+// page 从 1 开始，perPage 为每页条数。
+func (s *ArticleService) ListPage(page, perPage int) ([]models.Article, int, error) {
+	var total int
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM articles").Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("统计文章总数: %w", err)
+	}
+
+	rows, err := s.db.Query(
+		"SELECT id, title, content, author, tags, created_at, updated_at FROM articles ORDER BY created_at DESC LIMIT ? OFFSET ?",
+		perPage, (page-1)*perPage,
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("查询文章列表: %w", err)
+	}
+	defer rows.Close()
+
+	var articles []models.Article
+	for rows.Next() {
+		a, err := scanArticleFromRows(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		articles = append(articles, *a)
+	}
+	return articles, total, rows.Err()
+}
+
 // Update 修改已有文章，若 ID 不存在则返回错误。
 func (s *ArticleService) Update(a *models.Article) error {
 	now := time.Now().UTC().Format(time.RFC3339)

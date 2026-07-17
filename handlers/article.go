@@ -21,6 +21,7 @@ import (
 const (
 	maxArticleBodySize = 1 << 20 // 1 MB
 	charsPerMinute     = 400     // 中文平均阅读速度（字/分钟）
+	articlesPerPage    = 10      // 列表页每页文章数
 )
 
 // ArticleHandler 处理文章页面和 API 请求。
@@ -31,22 +32,51 @@ type ArticleHandler struct {
 	RAG        *services.RAGService // 可选：设置后自动在增删改时维护索引
 }
 
-// List 渲染文章列表页 — GET /articles。
+// List 渲染文章列表页 — GET /articles?page=N。
 func (h *ArticleHandler) List(w http.ResponseWriter, r *http.Request) {
-	articles, err := h.Service.List()
+	// 解析页码，缺省或非法时视为第 1 页
+	page := 1
+	if p, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && p > 1 {
+		page = p
+	}
+
+	articles, total, err := h.Service.ListPage(page, articlesPerPage)
 	if err != nil {
 		http.Error(w, "加载文章失败", http.StatusInternalServerError)
 		return
 	}
 
-	canonical := canonicalURL(r, "/articles")
+	totalPages := (total + articlesPerPage - 1) / articlesPerPage
+	if totalPages < 1 {
+		totalPages = 1
+	}
+	// 越界页码返回 404，与不存在的文章保持一致，避免空页被搜索引擎收录
+	if page > totalPages {
+		serveNotFound(w)
+		return
+	}
+
+	// 第 1 页的规范链接不带 page 参数，避免重复内容
+	path := "/articles"
+	title := "文章列表 — AI 智能文章站"
+	if page > 1 {
+		path = fmt.Sprintf("/articles?page=%d", page)
+		title = fmt.Sprintf("文章列表 — 第 %d 页 — AI 智能文章站", page)
+	}
+	canonical := canonicalURL(r, path)
 	data := map[string]interface{}{
-		"Title":          "文章列表 — AI 智能文章站",
+		"Title":          title,
 		"Description":    "浏览所有已发布的文章。",
 		"CanonicalURL":   canonical,
 		"OGType":         "website",
-		"StructuredData": articleListStructuredData(canonical, articles),
+		"StructuredData": articleListStructuredData(canonical, canonicalURL(r, ""), articles),
 		"Articles":       articles,
+		"Page":           page,
+		"TotalPages":     totalPages,
+		"HasPrev":        page > 1,
+		"HasNext":        page < totalPages,
+		"PrevPage":       page - 1,
+		"NextPage":       page + 1,
 	}
 	if err := h.ListTmpl.ExecuteTemplate(w, "base.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

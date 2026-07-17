@@ -18,6 +18,17 @@
     </article>
     {{end}}
 </div>
+{{if gt .TotalPages 1}}
+<nav class="pagination" aria-label="分页导航">
+    {{if .HasPrev}}
+    <a href="{{if gt .PrevPage 1}}/articles?page={{.PrevPage}}{{else}}/articles{{end}}" class="page-link">← 上一页</a>
+    {{end}}
+    <span class="page-info">第 {{.Page}} / {{.TotalPages}} 页</span>
+    {{if .HasNext}}
+    <a href="/articles?page={{.NextPage}}" class="page-link">下一页 →</a>
+    {{end}}
+</nav>
+{{end}}
 {{else}}
 <div class="empty-state">
     <p>暂无文章，请前往管理后台发布。</p>

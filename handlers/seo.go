@@ -65,9 +65,8 @@ func homeStructuredData(canonical string) template.HTML {
 }
 
 // articleListStructuredData 返回文章列表页的 JSON-LD。
-func articleListStructuredData(canonical string, articles []models.Article) template.HTML {
-	// canonical 格式为 "http://host/articles"，提取基础路径拼文章链接
-	base := strings.TrimSuffix(canonical, "/articles")
+// base 为站点根地址（如 "http://host"），用于拼接各文章链接。
+func articleListStructuredData(canonical, base string, articles []models.Article) template.HTML {
 	items := make([]string, 0, len(articles))
 	for i, a := range articles {
 		items = append(items, fmt.Sprintf(
