@@ -189,6 +189,28 @@
 
 ---
 
+### 第十二步：第二轮端到端测试与 Bug 修复
+
+**目标**: 扩大测试覆盖范围（50 项检查），修复新发现的 Bug。
+
+**全量端点测试结果**: 47/50 通过。
+
+**测试中发现的 Bug**:
+
+1. **Tags 字段不传时返回 null 而非 []** — `json.Marshal(nil)`（nil slice）返回字符串 `"null"` 存入数据库，读回后仍是 `null`。
+   - 修复：在 `Create` 和 `Update` 方法中，Marshal 前检查 `a.Tags == nil`，若为 nil 则初始化为 `[]string{}`
+
+2. **DELETE 不存在的文章 ID 返回 200** — 与已修复的 PUT bug 同根：`Service.Delete()` 未检查 `rowsAffected`，SQLite 的 `DELETE WHERE id=?` 匹配 0 行也不报错。
+   - 修复：`Delete` 方法改用 `result.RowsAffected()`，影响 0 行时返回错误；Handler 层通过 `GetByID` 区分"不存在"（404）与"服务端异常"（500）
+
+3. **未匹配路由的路径返回首页 200** — Go 1.26.5 中 `mux.HandleFunc("GET /", ...)` 将不匹配的路径也定向到首页处理器。
+   - 修复：改为 catch-all `mux.HandleFunc("/", ...)`，在 handler 内部校验 `r.URL.Path != "/"` 时调用 `ServeNotFound()` 返回 404
+
+**提交**: `7400e5f` fix: PUT 不存在的文章 ID 现在返回 404 而非 200（第一轮修复）
+**提交**: `2f50815` fix: Tags null→[]、DELETE 不存在返回 404、未知路径返回 404（第二轮修复）
+
+---
+
 ## 问题与解决汇总
 
 | 问题 | 解决方案 |
@@ -209,6 +231,10 @@
 | 文章页存在两个 h1 | Goldmark 渲染后标题降级（h1→h2） |
 | 主页 h3 跳过 h2 层级 | h3 改为 h2，形成 h1→h2 正确层级 |
 | 缺少 robots.txt / sitemap.xml | 新增路由，sitemap 动态生成文章 URL |
+| PUT 不存在 ID 返回 200 | Service 层加 `rowsAffected` 检查，Handler 层区分 404/500 |
+| Tags 字段返回 null | Create/Update 中 nil slice 初始化为 `[]string{}` 再序列化 |
+| DELETE 不存在 ID 返回 200 | 同 PUT：`rowsAffected` 检查 + Handler 区分 404/500 |
+| 未知路径路由到首页返回 200 | catch-all handler 校验 `r.URL.Path`，非 `/` 返回 404 |
 
 ## 最终项目结构
 
