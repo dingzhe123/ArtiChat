@@ -238,35 +238,66 @@
 
 ---
 
-## 问题与解决汇总
+## 架构决策回顾
 
-| 问题 | 解决方案 |
-|------|----------|
-| 模板 `{{define}}` 冲突 | 每个处理器独立模板集（`parseSet` 模式） |
-| Windows 终端 GBK 破坏中文 | 使用 `--data-binary @file` 发送 API 请求 |
-| HELYLLM API Key 失效 + 无 Embedding | 切换到 DeepSeek API |
-| Embedding 端点不存在 | 实现关键词检索 fallback（混合分词 + LCS） |
-| Embedding 请求卡住 120 秒 | 单独设置 8 秒短超时 |
-| 错误消息泄露内部信息 | 客户端返回通用提示，真实错误写 log |
-| API Key 硬编码 | 迁移到 .env 文件 |
-| 首页无内容显得空洞 | ~~改为纯静态欢迎页~~（后修正：首页应保持纯静态） |
-| 文章列表 JSON-LD URL 重复 | `TrimSuffix` 去除重复路径段 |
-| 表格标题过长撑坏布局 | `printf "%.30s"` 截断显示 |
-| 文章摘要残留 Markdown 语法 | 注册 StripMarkdown/Truncate 模板函数 + 正则多行模式 |
-| 404 页面为纯文本 | 新增 serveNotFound()，返回完整 HTML 页面 |
-| 主页实际为 SSR 非纯静态 | 去掉 DB 查询，改为纯静态欢迎页 + 功能卡片 |
-| 文章页存在两个 h1 | Goldmark 渲染后标题降级（h1→h2） |
-| 主页 h3 跳过 h2 层级 | h3 改为 h2，形成 h1→h2 正确层级 |
-| 缺少 robots.txt / sitemap.xml | 新增路由，sitemap 动态生成文章 URL |
-| PUT 不存在 ID 返回 200 | Service 层加 `rowsAffected` 检查，Handler 层区分 404/500 |
-| Tags 字段返回 null | Create/Update 中 nil slice 初始化为 `[]string{}` 再序列化 |
-| DELETE 不存在 ID 返回 200 | 同 PUT：`rowsAffected` 检查 + Handler 区分 404/500 |
-| 未知路径路由到首页返回 200 | catch-all handler 校验 `r.URL.Path`，非 `/` 返回 404 |
-| 回答末尾悬空「参考文章」 | 删除提示词中的来源标注要求，来源由 sources 字段承载 |
-| 无关片段混入 sources | `minSourceScore` 阈值过滤低相关性片段 |
-| reindex 全部失败仍报成功 | `ReindexAll` 返回统计，响应消息如实反映成败 |
-| 文章 2 创建时间为零值 | 遗留非 RFC3339 格式数据，一次性修复为标准格式 |
-| 文章列表无分页 | `ListPage` + 页码导航，越界 404，分页 canonical |
+开发过程中做出的关键取舍，按发生顺序整理。
+
+### 模板与渲染
+
+| 决策 | 选择 | 原因 |
+|------|------|------|
+| 模板加载方式 | 每页面独立 `parseSet()` | 避免 `{{define "content"}}` 跨文件覆盖 |
+| Markdown 渲染 | Goldmark（服务端） | SEO 友好，不需要客户端 JS |
+| h1 去重 | `shiftHeadings()` 降级 | 文章正文标题不抢页面级 h1 |
+
+### 数据与存储
+
+| 决策 | 选择 | 原因 |
+|------|------|------|
+| 数据库 | SQLite + WAL 模式 | 零部署、免运维；WAL 提升并发读 |
+| 标签存储 | JSON 数组存 TEXT 字段 | 灵活，无需关联表 |
+| 时间格式 | RFC3339 字符串 | SQLite 原生可比较，无时区歧义 |
+| Tags 默认值 | nil → `[]string{}` | API 返回 `[]` 而非 `null`，前端更安全 |
+
+### API 与路由
+
+| 决策 | 选择 | 原因 |
+|------|------|------|
+| 路由方案 | Go 1.22 增强路由 `GET /articles/{id}` | 标准库足够，无需 Gin/Chi |
+| 管理后台鉴权 | Basic Auth 闭包中间件 | `auth(handler)` 模式简洁可复用 |
+| 404 处理 | 自定义 HTML 页面 | `http.NotFound` 只输出纯文本，体验差 |
+| 未知路径 | catch-all + `r.URL.Path` 校验 | Go 1.22 `GET /` 会匹配未注册路径 |
+| 请求体限制 | `http.MaxBytesReader` | 文章 1MB，聊天 32KB |
+| 错误脱敏 | 客户端通用提示 + 服务端 log | 不泄露内部信息 |
+
+### RAG 与 LLM
+
+| 决策 | 选择 | 原因 |
+|------|------|------|
+| Embedding 超时 | 8 秒（Chat 用 120 秒） | 快速失败回退，不阻塞检索 |
+| 检索降级 | 向量 → 关键词 fallback | Embedding 端点可能不可用 |
+| 中文分词 | Unigram + Bigram + LCS 加分 | 兼顾单字覆盖与词组匹配 |
+| 来源过滤 | `minSourceScore = 0.15` | 低分片段不进入上下文和来源列表 |
+| 流式响应 | SSE 直传 `io.Copy` | 不做解析，原样转发给前端 |
+| API Key | `.env` 文件 + `.gitignore` | 不硬编码，不入库 |
+
+### SEO
+
+| 决策 | 选择 | 原因 |
+|------|------|------|
+| 渲染模式 | 全 SSR（Go template） | 搜索引擎可抓取完整内容 |
+| 结构化数据 | JSON-LD（WebSite/Article/CollectionPage） | 丰富搜索结果展示 |
+| Canonical | 每页自动从 request 构造 | 避免重复收录 |
+| Sitemap | 动态生成 | 随文章增删自动更新 |
+| 分页 | 第 2 页起 canonical 带 page 参数 | 第 1 页不重复收录 |
+
+### 前端
+
+| 决策 | 选择 | 原因 |
+|------|------|------|
+| 聊天组件 | 原生 JS，零依赖 | 轻量，快速加载 |
+| 来源展示 | 可折叠列表 + 相似度分数 | 透明可验证 |
+| 错误处理 | 重试按钮 + 保留上一条问题 | 不丢上下文 |
 
 ## 最终项目结构
 
