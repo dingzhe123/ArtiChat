@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"ai-article-site/models"
@@ -66,12 +67,13 @@ func (h *ArticleHandler) Detail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Markdown → HTML
+	// Markdown → HTML，并降级标题避免与页面 h1 重复
 	var buf bytes.Buffer
 	if err := goldmark.Convert([]byte(article.Content), &buf); err != nil {
 		http.Error(w, "内容渲染失败", http.StatusInternalServerError)
 		return
 	}
+	contentHTML := shiftHeadings(buf.String())
 
 	// 纯文本描述 + 预估阅读时间
 	desc := Truncate(StripMarkdown(article.Content), 160)
@@ -92,7 +94,7 @@ func (h *ArticleHandler) Detail(w http.ResponseWriter, r *http.Request) {
 		"ArticleModified":  article.UpdatedAt.Format(time.RFC3339),
 		"StructuredData":   articleDetailStructuredData(canonical, article, desc),
 		"Article":          article,
-		"ContentHTML":      template.HTML(buf.String()),
+		"ContentHTML":      template.HTML(contentHTML),
 		"ReadMin":          readMin,
 	}
 	if err := h.DetailTmpl.ExecuteTemplate(w, "base.html", data); err != nil {
@@ -250,4 +252,16 @@ func serveNotFound(w http.ResponseWriter) {
 <footer class="site-footer"><div class="container"><p>AI 智能文章站</p></div></footer>
 </body>
 </html>`)
+}
+
+// shiftHeadings 将 Markdown 渲染出的 HTML 标题降一级（h1→h2, h2→h3…），
+// 确保页面模板中的 <h1> 是唯一的，满足 SEO 最佳实践。
+func shiftHeadings(html string) string {
+	return strings.NewReplacer(
+		"<h5>", "<h6>", "</h5>", "</h6>",
+		"<h4>", "<h5>", "</h4>", "</h5>",
+		"<h3>", "<h4>", "</h3>", "</h4>",
+		"<h2>", "<h3>", "</h2>", "</h3>",
+		"<h1>", "<h2>", "</h1>", "</h2>",
+	).Replace(html)
 }

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+	"strings"
 
 	"ai-article-site/config"
 	"ai-article-site/handlers"
@@ -93,6 +95,29 @@ func main() {
 	// 静态文件服务
 	fs := http.FileServer(http.Dir("static"))
 	mux.Handle("GET /static/", http.StripPrefix("/static/", fs))
+
+	// robots.txt
+	mux.HandleFunc("GET /robots.txt", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		fmt.Fprint(w, "User-agent: *\nAllow: /\nSitemap: http://"+r.Host+"/sitemap.xml\n")
+	})
+
+	// sitemap.xml — 动态生成，列出所有文章 URL
+	mux.HandleFunc("GET /sitemap.xml", func(w http.ResponseWriter, r *http.Request) {
+		articles, _ := articleSvc.List()
+		var b strings.Builder
+		b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
+		b.WriteString(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n")
+		b.WriteString(fmt.Sprintf("  <url><loc>http://%s/</loc><priority>1.0</priority></url>\n", r.Host))
+		b.WriteString(fmt.Sprintf("  <url><loc>http://%s/articles</loc><priority>0.8</priority></url>\n", r.Host))
+		for _, a := range articles {
+			b.WriteString(fmt.Sprintf("  <url><loc>http://%s/articles/%d</loc><lastmod>%s</lastmod><priority>0.6</priority></url>\n",
+				r.Host, a.ID, a.UpdatedAt.Format("2006-01-02")))
+		}
+		b.WriteString("</urlset>\n")
+		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+		w.Write([]byte(b.String()))
+	})
 
 	// 应用中间件: CORS → 日志 → 路由
 	handler := middleware.Logger(middleware.CORS(mux))
