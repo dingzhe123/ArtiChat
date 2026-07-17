@@ -73,7 +73,13 @@ func main() {
 	mux := http.NewServeMux()
 
 	// 公开页面
-	mux.HandleFunc("GET /", homeH.ServeHTTP)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			handlers.ServeNotFound(w)
+			return
+		}
+		homeH.ServeHTTP(w, r)
+	})
 	mux.HandleFunc("GET /articles", articleH.List)
 	mux.HandleFunc("GET /articles/{id}", articleH.Detail)
 

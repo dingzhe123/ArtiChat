@@ -70,6 +70,9 @@ func (s *ArticleService) Create(a *models.Article) (int64, error) {
 		a.UpdatedAt = time.Now().UTC()
 	}
 
+	if a.Tags == nil {
+		a.Tags = []string{}
+	}
 	tagsJSON, err := json.Marshal(a.Tags)
 	if err != nil {
 		return 0, fmt.Errorf("序列化标签: %w", err)
@@ -113,6 +116,9 @@ func (s *ArticleService) List() ([]models.Article, error) {
 // Update 修改已有文章，若 ID 不存在则返回错误。
 func (s *ArticleService) Update(a *models.Article) error {
 	now := time.Now().UTC().Format(time.RFC3339)
+	if a.Tags == nil {
+		a.Tags = []string{}
+	}
 	tagsJSON, err := json.Marshal(a.Tags)
 	if err != nil {
 		return fmt.Errorf("序列化标签: %w", err)
@@ -133,10 +139,17 @@ func (s *ArticleService) Update(a *models.Article) error {
 	return nil
 }
 
-// Delete 按 ID 删除文章。
+// Delete 按 ID 删除文章，若 ID 不存在则返回错误。
 func (s *ArticleService) Delete(id int64) error {
-	_, err := s.db.Exec("DELETE FROM articles WHERE id=?", id)
-	return err
+	result, err := s.db.Exec("DELETE FROM articles WHERE id=?", id)
+	if err != nil {
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("文章 %d 不存在", id)
+	}
+	return nil
 }
 
 // scanArticle 从 Scanner 读取一行并解析为 Article。

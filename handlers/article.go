@@ -211,6 +211,13 @@ func (h *ArticleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.Service.Delete(id); err != nil {
+		// 区分"文章不存在"与真正的服务端错误
+		if _, getErr := h.Service.GetByID(id); getErr != nil {
+			writeJSON(w, http.StatusNotFound, map[string]interface{}{
+				"ok": false, "error": "文章不存在",
+			})
+			return
+		}
 		log.Printf("删除文章 %d 失败: %v", id, err)
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
 			"ok": false, "error": "删除文章失败",
@@ -231,6 +238,11 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
+}
+
+// ServeNotFound 返回一个包含站点布局的 HTML 404 页面，供路由层调用。
+func ServeNotFound(w http.ResponseWriter) {
+	serveNotFound(w)
 }
 
 // serveNotFound 返回一个包含站点布局的 HTML 404 页面。
