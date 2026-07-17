@@ -178,6 +178,13 @@ func (h *ArticleHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	a.ID = id
 	if err := h.Service.Update(&a); err != nil {
+		// 区分"文章不存在"与真正的服务端错误
+		if _, getErr := h.Service.GetByID(id); getErr != nil {
+			writeJSON(w, http.StatusNotFound, map[string]interface{}{
+				"ok": false, "error": "文章不存在",
+			})
+			return
+		}
 		log.Printf("更新文章 %d 失败: %v", id, err)
 		writeJSON(w, http.StatusInternalServerError, map[string]interface{}{
 			"ok": false, "error": "更新文章失败",

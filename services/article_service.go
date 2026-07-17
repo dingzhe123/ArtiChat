@@ -110,7 +110,7 @@ func (s *ArticleService) List() ([]models.Article, error) {
 	return articles, rows.Err()
 }
 
-// Update 修改已有文章。
+// Update 修改已有文章，若 ID 不存在则返回错误。
 func (s *ArticleService) Update(a *models.Article) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	tagsJSON, err := json.Marshal(a.Tags)
@@ -118,11 +118,19 @@ func (s *ArticleService) Update(a *models.Article) error {
 		return fmt.Errorf("序列化标签: %w", err)
 	}
 
-	_, err = s.db.Exec(
+	result, err := s.db.Exec(
 		"UPDATE articles SET title=?, content=?, author=?, tags=?, updated_at=? WHERE id=?",
 		a.Title, a.Content, a.Author, string(tagsJSON), now, a.ID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("文章 %d 不存在", a.ID)
+	}
+	return nil
 }
 
 // Delete 按 ID 删除文章。
