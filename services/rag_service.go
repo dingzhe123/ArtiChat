@@ -109,34 +109,42 @@ func splitSentences(text string) []string {
 // IndexArticle 为文章生成文本块并存入数据库。
 // Embedding 失败时静默回退，块仍会被存储并支持关键词检索。
 func (s *RAGService) IndexArticle(article *models.Article) error {
+	_, _, err := s.indexArticle(article)
+	return err
+}
+
+// indexArticle 执行分块与嵌入，返回向量生成成功/回退的块数。
+func (s *RAGService) indexArticle(article *models.Article) (embedded, fallback int, err error) {
 	if err := s.DeleteChunks(article.ID); err != nil {
-		return fmt.Errorf("清除旧块: %w", err)
+		return 0, 0, fmt.Errorf("清除旧块: %w", err)
 	}
 
 	chunks := chunkArticle(article.Content)
 	if len(chunks) == 0 {
-		return nil
+		return 0, 0, nil
 	}
 
 	for idx, chunk := range chunks {
 		var embJSON string
-		embedding, err := s.llm.Embed(chunk)
-		if err != nil {
-			log.Printf("Embedding 失败（文章 %d 块 %d，将使用关键词检索）: %v", article.ID, idx, err)
+		embedding, embErr := s.llm.Embed(chunk)
+		if embErr != nil {
+			log.Printf("Embedding 失败（文章 %d 块 %d，将使用关键词检索）: %v", article.ID, idx, embErr)
 			embJSON = "[]"
+			fallback++
 		} else {
 			b, _ := json.Marshal(embedding)
 			embJSON = string(b)
+			embedded++
 		}
 
 		if _, err := s.db.Exec(
 			"INSERT INTO article_chunks (article_id, chunk_idx, content, embedding) VALUES (?, ?, ?, ?)",
 			article.ID, idx, chunk, embJSON,
 		); err != nil {
-			return fmt.Errorf("插入块: %w", err)
+			return embedded, fallback, fmt.Errorf("插入块: %w", err)
 		}
 	}
-	return nil
+	return embedded, fallback, nil
 }
 
 // DeleteChunks 删除指定文章的所有文本块。
@@ -383,26 +391,40 @@ func tokenizeHybrid(text string) []string {
 	return out
 }
 
-// ReindexAll 清空所有块并重新索引全部文章。
-func (s *RAGService) ReindexAll(as *ArticleService) error {
+// ReindexStats 记录一次重建索引的结果统计。
+type ReindexStats struct {
+	Articles int `json:"articles"` // 已索引文章数
+	Chunks   int `json:"chunks"`   // 生成的文本块总数
+	Embedded int `json:"embedded"` // 成功生成向量的块数
+	Fallback int `json:"fallback"` // 向量生成失败、回退关键词检索的块数
+}
+
+// ReindexAll 清空所有块并重新索引全部文章，返回向量生成的成败统计。
+func (s *RAGService) ReindexAll(as *ArticleService) (*ReindexStats, error) {
 	if _, err := s.db.Exec("DELETE FROM article_chunks"); err != nil {
-		return fmt.Errorf("清空块: %w", err)
+		return nil, fmt.Errorf("清空块: %w", err)
 	}
 
 	articles, err := as.List()
 	if err != nil {
-		return fmt.Errorf("列出文章: %w", err)
+		return nil, fmt.Errorf("列出文章: %w", err)
 	}
 
+	stats := &ReindexStats{Articles: len(articles)}
 	log.Printf("正在重建索引（共 %d 篇文章）...", len(articles))
 	for i := range articles {
 		log.Printf("  [%d/%d] 索引文章 %d: %s", i+1, len(articles), articles[i].ID, articles[i].Title)
-		if err := s.IndexArticle(&articles[i]); err != nil {
-			return fmt.Errorf("索引文章 %d: %w", articles[i].ID, err)
+		embedded, fallback, err := s.indexArticle(&articles[i])
+		if err != nil {
+			return nil, fmt.Errorf("索引文章 %d: %w", articles[i].ID, err)
 		}
+		stats.Embedded += embedded
+		stats.Fallback += fallback
 	}
-	log.Printf("索引重建完成 — 共 %d 篇文章", len(articles))
-	return nil
+	stats.Chunks = stats.Embedded + stats.Fallback
+	log.Printf("索引重建完成 — %d 篇文章 %d 个块（向量 %d 成功 / %d 回退关键词）",
+		stats.Articles, stats.Chunks, stats.Embedded, stats.Fallback)
+	return stats, nil
 }
 
 // cosineSimilarity 计算两个向量的余弦相似度。
