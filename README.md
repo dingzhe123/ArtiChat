@@ -9,7 +9,7 @@
 - **智能问答**：基于 RAG 架构，检索相关文章片段后由大模型生成回答
 - **RAG 检索**：支持向量检索（需 Embedding API）+ 关键词检索自动降级
 - **流式输出**：问答回复支持 SSE 流式传输，打字机效果
-- **SEO 友好**：服务端渲染，Open Graph 标签，JSON-LD 结构化数据
+- **SEO 优化**：纯静态主页、robots.txt + sitemap.xml、Open Graph 标签、JSON-LD 结构化数据、语义化标题层级
 - **响应式设计**：适配桌面端与移动端
 
 ## 技术栈
@@ -101,9 +101,11 @@ go run main.go
 
 | Method | Path | 说明 |
 |--------|------|------|
-| `GET` | `/` | 主页 |
+| `GET` | `/` | 主页（纯静态，不查数据库） |
 | `GET` | `/articles` | 文章列表页 |
 | `GET` | `/articles/{id}` | 文章详情页 |
+| `GET` | `/robots.txt` | 爬虫规则 |
+| `GET` | `/sitemap.xml` | 站点地图（动态生成） |
 | `POST` | `/api/chat` | 智能问答（JSON: `{"question": "..."}`） |
 
 ### 管理接口（需 Basic Auth）
