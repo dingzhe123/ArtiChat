@@ -22,17 +22,17 @@ func canonicalURL(r *http.Request, path string) string {
 
 // 用于清洗 Markdown 格式的正则表达式。
 var (
-	reHeading  = regexp.MustCompile(`^#{1,6}\s+`)
+	reHeading  = regexp.MustCompile(`(?m)^#{1,6}\s+`)
 	reLink     = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
 	reImage    = regexp.MustCompile(`!\[[^\]]*\]\([^)]*\)`)
 	reCode     = regexp.MustCompile("`{1,3}[^`]*`{1,3}")
 	reBold     = regexp.MustCompile(`\*{1,2}([^*]+)\*{1,2}`)
-	reListItem = regexp.MustCompile(`^[\s]*[-*+]\s+`)
+	reListItem = regexp.MustCompile(`(?m)^[\s]*[-*+]\s+`)
 	reHTML     = regexp.MustCompile(`<[^>]*>`)
 )
 
-// stripMarkdown 移除常见 Markdown 语法，返回纯文本用于描述。
-func stripMarkdown(s string) string {
+// StripMarkdown 移除常见 Markdown 语法，返回纯文本用于描述。
+func StripMarkdown(s string) string {
 	s = reImage.ReplaceAllString(s, "")
 	s = reLink.ReplaceAllString(s, "$1")
 	s = reCode.ReplaceAllString(s, "")
@@ -47,8 +47,8 @@ func stripMarkdown(s string) string {
 	return strings.TrimSpace(s)
 }
 
-// truncate 将字符串截断到 maxLen 个字符，超出部分用 "…" 代替。
-func truncate(s string, maxLen int) string {
+// Truncate 将字符串截断到 maxLen 个字符，超出部分用 "…" 代替。
+func Truncate(s string, maxLen int) string {
 	runes := []rune(s)
 	if len(runes) <= maxLen {
 		return s

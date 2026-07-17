@@ -11,11 +11,17 @@ import (
 	"ai-article-site/services"
 )
 
+// templateFuncs 向模板暴露的辅助函数，用于清洗 Markdown 和截断文本。
+var templateFuncs = template.FuncMap{
+	"StripMarkdown": handlers.StripMarkdown,
+	"Truncate":      handlers.Truncate,
+}
+
 // parseSet 将 base.html 与指定的内容模板文件解析为一个模板集。
 // 每个模板集拥有独立的 "content" 定义，避免 ParseGlob 带来的命名冲突。
 func parseSet(contentFiles ...string) *template.Template {
 	paths := append([]string{"templates/base.html"}, contentFiles...)
-	return template.Must(template.ParseFiles(paths...))
+	return template.Must(template.New("base.html").Funcs(templateFuncs).ParseFiles(paths...))
 }
 
 func main() {
@@ -44,7 +50,7 @@ func main() {
 	adminTmpl := parseSet("templates/admin.html")
 
 	// 各处理器
-	homeH := &handlers.HomeHandler{Tmpl: homeTmpl, Service: articleSvc}
+	homeH := &handlers.HomeHandler{Tmpl: homeTmpl}
 	articleH := &handlers.ArticleHandler{
 		ListTmpl:   articlesListTmpl,
 		DetailTmpl: articlesDetailTmpl,

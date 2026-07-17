@@ -18,6 +18,9 @@ data/site.db-*
 # Environment secrets
 .env
 
+# Go module cache
+pkg/
+
 # Project docs (local only)
 CLAUDE.md
 

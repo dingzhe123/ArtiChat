@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	"math"
@@ -55,13 +56,13 @@ func (h *ArticleHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *ArticleHandler) Detail(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		http.NotFound(w, r)
+		serveNotFound(w)
 		return
 	}
 
 	article, err := h.Service.GetByID(id)
 	if err != nil {
-		http.NotFound(w, r)
+		serveNotFound(w)
 		return
 	}
 
@@ -73,7 +74,7 @@ func (h *ArticleHandler) Detail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 纯文本描述 + 预估阅读时间
-	desc := truncate(stripMarkdown(article.Content), 160)
+	desc := Truncate(StripMarkdown(article.Content), 160)
 	charCount := len([]rune(article.Content))
 	readMin := int(math.Ceil(float64(charCount) / float64(charsPerMinute)))
 	if readMin < 1 {
@@ -216,8 +217,37 @@ func (h *ArticleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 // writeJSON 以 JSON 格式写入响应。
+// writeJSON 以 JSON 格式写入响应。
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
+}
+
+// serveNotFound 返回一个包含站点布局的 HTML 404 页面。
+func serveNotFound(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusNotFound)
+	fmt.Fprint(w, `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>页面未找到 — AI 智能文章站</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<header class="site-header"><div class="container">
+<a href="/" class="logo">AI 智能文章站</a>
+<nav><a href="/">首页</a><a href="/articles">文章</a><a href="/admin">管理</a></nav>
+</div></header>
+<main class="site-main"><div class="container" style="text-align:center;padding:80px 0;">
+<h1>404</h1>
+<p>页面未找到，该文章可能已被删除或不存在。</p>
+<p><a href="/" class="btn btn-primary">返回首页</a>
+<a href="/articles" class="btn btn-secondary">浏览文章</a></p>
+</div></main>
+<footer class="site-footer"><div class="container"><p>AI 智能文章站</p></div></footer>
+</body>
+</html>`)
 }

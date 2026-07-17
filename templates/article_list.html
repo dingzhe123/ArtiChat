@@ -13,7 +13,7 @@
             <span>标签 {{range $i, $t := .Tags}}{{if $i}}, {{end}}{{$t}}{{end}}</span>
             {{end}}
         </div>
-        <p class="article-excerpt">{{printf "%.200s" .Content}}...</p>
+        <p class="article-excerpt">{{Truncate (StripMarkdown .Content) 200}}...</p>
         <a href="/articles/{{.ID}}" class="read-more">阅读全文</a>
     </article>
     {{end}}

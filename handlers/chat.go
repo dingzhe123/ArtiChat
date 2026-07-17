@@ -86,7 +86,7 @@ func (h *ChatHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 		contextBuilder.WriteString("\n\n")
 		sources = append(sources, ChatSource{
 			ArticleID: r.Chunk.ArticleID,
-			Content:   truncate(r.Chunk.Content, 200),
+			Content:   Truncate(r.Chunk.Content, 200),
 			Score:     r.Similarity,
 		})
 	}

@@ -11,11 +11,11 @@
     <header class="article-header">
         <h1>{{.Article.Title}}</h1>
         <div class="article-meta">
-            <span>✍️ {{.Article.Author}}</span>
-            <span>📅 {{.Article.CreatedAt.Format "2006-01-02"}}</span>
-            <span>⏱️ 约 {{.ReadMin}} 分钟阅读</span>
+            <span>作者: {{.Article.Author}}</span>
+            <span>创建时间: {{.Article.CreatedAt.Format "2006-01-02"}}</span>
+            <span>时间: 约 {{.ReadMin}} 分钟阅读</span>
             {{if .Article.Tags}}
-            <span>🏷️ {{range $i, $t := .Article.Tags}}{{if $i}}, {{end}}{{$t}}{{end}}</span>
+            <span>标签：{{range $i, $t := .Article.Tags}}{{if $i}}, {{end}}{{$t}}{{end}}</span>
             {{end}}
         </div>
     </header>
