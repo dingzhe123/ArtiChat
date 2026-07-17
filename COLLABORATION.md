@@ -141,6 +141,54 @@
 
 ---
 
+### 第九步：文档编写
+
+**目标**: 编写项目文档，方便他人了解和使用。
+
+**实现内容**:
+- README.md：项目介绍、快速开始、环境变量、项目结构、API 文档、RAG 架构
+- COLLABORATION.md（本文件）：完整的协作过程记录
+
+**提交**: `03633d4` docs: 添加 README 与协作过程文档
+
+---
+
+### 第十步：端到端测试与闭环修复
+
+**目标**: 实际运行服务，测试全部端点，修复发现的问题。
+
+**全量端点测试结果**: 10 个端点全部通过（页面/API/认证/404/问答/索引重建）。
+
+**测试中发现的 Bug**:
+
+1. **文章摘要残留 Markdown 语法** — 模板使用 `{{printf "%.200s" .Content}}` 直接截取原始 Markdown，导致 `#`、`##`、`**` 等标记出现在摘要中。
+   - 修复：将 `StripMarkdown` 和 `Truncate` 导出为模板函数，注册到 `template.FuncMap`，模板改为 `{{Truncate (StripMarkdown .Content) 200}}`
+   - 同时修复 Markdown 清洗正则缺少多行模式（`(?m)`），导致段落中间的标题和列表项无法清除
+
+2. **404 页面返回纯文本** — `http.NotFound(w, r)` 输出 `404 page not found` 纯文本，无 HTML 结构。
+   - 修复：新增 `serveNotFound()` 函数，返回带站点头部/导航/返回链接的完整 HTML 页面
+
+3. **主页实际为 SSR 而非纯静态** — 原 `HomeHandler` 查询数据库获取最新 5 篇文章，与 CLAUDE.md 中"纯静态页面"的要求不符。
+   - 修复：去掉 `HomeHandler` 对 `ArticleService` 的依赖，不查询数据库，只渲染静态的欢迎页 + 功能介绍卡片。文章浏览统一走 `/articles` 页面。
+
+**提交**: `0f50038` fix: 端到端测试、主页改造为纯静态、修复摘要与404问题
+
+---
+
+### 第十一步：SEO 深化优化
+
+**目标**: 查漏补缺，使站点对搜索引擎更加友好。
+
+**实现内容**:
+- **robots.txt** — 声明全站允许爬取，指向 sitemap
+- **sitemap.xml** — 动态生成，含主页（1.0）、列表页（0.8）、文章页（0.6）三级优先级
+- **h1 去重** — Goldmark 渲染的 Markdown 内容中标题自动降一级（h1→h2），确保每页只有一个 h1
+- **标题层级修正** — 主页 feature 卡片从 h3 改为 h2，形成 h1→h2 正常层级
+
+**提交**: `4823d8a` fix: SEO 优化 — robots.txt/sitemap、h1 去重、标题层级修正
+
+---
+
 ## 问题与解决汇总
 
 | 问题 | 解决方案 |
@@ -152,9 +200,15 @@
 | Embedding 请求卡住 120 秒 | 单独设置 8 秒短超时 |
 | 错误消息泄露内部信息 | 客户端返回通用提示，真实错误写 log |
 | API Key 硬编码 | 迁移到 .env 文件 |
-| 首页无内容显得空洞 | 有文章时展示最新文章列表 |
+| 首页无内容显得空洞 | ~~改为纯静态欢迎页~~（后修正：首页应保持纯静态） |
 | 文章列表 JSON-LD URL 重复 | `TrimSuffix` 去除重复路径段 |
 | 表格标题过长撑坏布局 | `printf "%.30s"` 截断显示 |
+| 文章摘要残留 Markdown 语法 | 注册 StripMarkdown/Truncate 模板函数 + 正则多行模式 |
+| 404 页面为纯文本 | 新增 serveNotFound()，返回完整 HTML 页面 |
+| 主页实际为 SSR 非纯静态 | 去掉 DB 查询，改为纯静态欢迎页 + 功能卡片 |
+| 文章页存在两个 h1 | Goldmark 渲染后标题降级（h1→h2） |
+| 主页 h3 跳过 h2 层级 | h3 改为 h2，形成 h1→h2 正确层级 |
+| 缺少 robots.txt / sitemap.xml | 新增路由，sitemap 动态生成文章 URL |
 
 ## 最终项目结构
 
@@ -163,7 +217,8 @@ ai-article-site/
 ├── main.go
 ├── go.mod / go.sum
 ├── .env.example                # 环境变量模板
-├── COLLABORATION.md
+├── README.md                    # 项目说明与使用文档
+├── COLLABORATION.md             # 协作过程记录
 ├── config/
 │   └── config.go               # 配置管理（.env 加载 + 环境变量）
 ├── models/
