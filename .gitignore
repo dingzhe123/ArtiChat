@@ -23,6 +23,7 @@ pkg/
 
 # Project docs (local only)
 CLAUDE.md
+COLLABORATION.md
 
 # OS
 .DS_Store
